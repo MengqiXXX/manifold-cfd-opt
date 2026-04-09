@@ -6,7 +6,6 @@ import shutil
 import tarfile
 import tempfile
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -259,16 +258,13 @@ class RemoteOpenFOAMEvaluator(Evaluator):
 
     def evaluate_batch(self, params_list: list[DesignParams]) -> list[EvalResult]:
         results: list[EvalResult] = []
-        with ThreadPoolExecutor(max_workers=min(8, len(params_list))) as ex:
-            futs = {ex.submit(self.evaluate_one, p): i for i, p in enumerate(params_list)}
-            ordered: list[EvalResult | None] = [None] * len(params_list)
-            for fut in as_completed(futs):
-                i = futs[fut]
-                try:
-                    ordered[i] = fut.result()
-                except Exception as e:
-                    ordered[i] = EvalResult(
-                        params=params_list[i],
+        for p in params_list:
+            try:
+                results.append(self.evaluate_one(p))
+            except Exception as e:
+                results.append(
+                    EvalResult(
+                        params=p,
                         flow_cv=float("nan"),
                         pressure_drop=float("nan"),
                         converged=False,
@@ -276,7 +272,5 @@ class RemoteOpenFOAMEvaluator(Evaluator):
                         status="ERROR",
                         metadata={"error": f"{type(e).__name__}: {e}"},
                     )
-        for r in ordered:
-            if r is not None:
-                results.append(r)
+                )
         return results
