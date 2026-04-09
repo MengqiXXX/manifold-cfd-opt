@@ -1,4 +1,4 @@
-// Vortex Tube AI Optimization System — Dashboard
+// Manifold AI Optimization System — Dashboard
 // Designed for non-engineering audiences
 
 const S = {
@@ -35,8 +35,8 @@ function el(tag, attrs={}, ...children){
 
 const PIPELINE_STEPS = [
   { id:'bo',      icon:'🧠', name:'贝叶斯优化 AI', desc:'根据历史数据智能推荐下一批待测参数', explain:'就像做过数百次实验的专家：根据已有数据判断哪里最有可能更好，而非随机猜测' },
-  { id:'cfd',     icon:'🌀', name:'物理仿真',       desc:'512核CPU并行运行流体力学数值计算', explain:'用计算机模拟气体在涡流管内的真实运动，替代昂贵的实物实验' },
-  { id:'llm',     icon:'💬', name:'AI 分析',        desc:'72B大语言模型解读仿真结果提取规律', explain:'Qwen2.5-72B 把一堆数字翻译成人类可理解的结论和建议' },
+  { id:'cfd',     icon:'🌀', name:'物理仿真',       desc:'并行运行 OpenFOAM 流体力学数值计算', explain:'用计算机模拟气体在歧管内的分配与压力损失，替代反复试制' },
+  { id:'llm',     icon:'💬', name:'AI 分析',        desc:'大语言模型解读仿真结果并提出改进方向', explain:'Qwen 将一堆数字翻译成人类可理解的结论和建议' },
   { id:'anomaly', icon:'🔍', name:'异常检测',       desc:'自动识别数值发散或可疑结果', explain:'防止错误的仿真结果误导优化方向，需要时自动暂停并提示' },
   { id:'report',  icon:'📊', name:'报告生成',       desc:'优化完成后输出最优设计和完整分析', explain:'汇总整个搜索过程，给出最优参数和工程建议' },
 ]
@@ -89,12 +89,12 @@ function buildLayout(){
   const app=document.getElementById('app')
   app.innerHTML=''
 
-  const storyHtml='我们正在用 <b>AI 自动寻找最优的涡流管几何参数</b>。涡流管利用气体旋转实现冷热分离，核心问题是：<b>选什么样的管径、长度和冷端开口大小，才能让制冷效果最好？</b><br><br>传统方法需要工程师手工测试数百种方案，耗时数月。这套系统用 <b>贝叶斯优化 AI + 物理仿真 + 大语言模型</b>，在数小时内自动探索数百种设计，找到最优解。'
+  const storyHtml='我们正在用 <b>AI 自动寻找最优的歧管分流设计</b>。歧管把气体从一个总入口分配到多个出口，核心问题是：<b>如何让各出口流量尽可能均匀，同时把压降降到最低？</b><br><br>传统方法需要工程师手工试很多种几何/导流方案，耗时很长。这套系统用 <b>贝叶斯优化 AI + OpenFOAM 物理仿真 + Qwen 分析</b>，自动探索参数空间，持续逼近更好的分流效果。'
 
   app.appendChild(
     el('div',{class:'layout'},
       el('div',{class:'topbar'},
-        el('span',{class:'topbar-logo'},'涡流管 AI 寻优系统'),
+        el('span',{class:'topbar-logo'},'歧管 AI 寻优系统'),
         el('span',{id:'status-dot',class:'dot idle'}),
         el('span',{id:'status-text',class:'topbar-sub'},'连接中…'),
         el('span',{id:'metrics-source',style:{fontSize:'10px',color:'var(--muted2)',marginLeft:'auto',opacity:'0.7'}},''),
@@ -350,12 +350,12 @@ function renderCFDStatus(){
   if(st.cases&&st.cases.length>0){
     const table=el('table',{class:'cfd-table'})
     const thead=el('thead')
-    thead.innerHTML='<tr><th>工况</th><th>管径 D (mm)</th><th>管长 L (mm)</th><th>长径比 L/D</th><th>冷端比 r_c</th><th>网格数</th><th>当前步</th></tr>'
+    thead.innerHTML='<tr><th>工况</th><th>网格数</th><th>当前步</th></tr>'
     table.appendChild(thead)
     const tbody=el('tbody')
     for(const c of st.cases){
       const tr=el('tr')
-      tr.innerHTML=`<td>${c.case_id}</td><td>${c.D_mm??'—'}</td><td>${c.L_mm??'—'}</td><td>${c.L_D??'—'}</td><td>${c.r_c??'—'}</td><td>${c.n_cells!=null?fmtK(c.n_cells):'—'}</td><td>${c.current_step??'—'}</td>`
+      tr.innerHTML=`<td>${c.case_id}</td><td>${c.n_cells!=null?fmtK(c.n_cells):'—'}</td><td>${c.current_step??'—'}</td>`
       tbody.appendChild(tr)
     }
     table.appendChild(tbody)
@@ -477,7 +477,7 @@ function renderHardware(){
     gpus.forEach(function(g){
       const hist=S.metricHistory.gpus['gpu'+g.index]||[]
       let task
-      if(g.usagePct>60)task='<b>正在运行 Qwen2.5-72B</b>，处理语言理解与报告生成'
+      if(g.usagePct>60)task='<b>正在运行 Qwen</b>，处理语言理解与报告生成'
       else if(g.usagePct>10)task='<b>待命中</b>，语言模型已加载'
       else task='<b>空闲</b>，等待推理请求'
       cards.push(buildHwCard({chip:'gpu',chipLabel:'GPU '+g.index,name:g.name,role:'语言模型推理加速卡',pct:g.usagePct,usedBytes:g.memUsedBytes,totalBytes:g.memTotalBytes,tempC:g.tempC,task:task,history:hist,barClass:'gpu-bar'}))
@@ -579,6 +579,8 @@ function renderOptimization(){
   const evaluated=job.evaluated||0
   const budget=job.budget||0
   const bestObj=job.best_objective
+  const bestCV=job.best_flow_cv
+  const bestDP=job.best_pressure_drop
   const pct=budget>0?Math.round((evaluated/budget)*100):0
 
   const inner=el('div')
@@ -591,9 +593,9 @@ function renderOptimization(){
       el('div',{class:'stat-sub'},'完成 '+pct+'%'),
     ),
     el('div',{class:'stat-card'},
-      el('div',{class:'stat-label'},'当前最优冷端温降'),
-      el('div',{class:'stat-val',style:{color:'var(--green)'}},bestObj!=null?(+bestObj).toFixed(1)+'':'—',el('span',{class:'stat-unit'},'K')),
-      el('div',{class:'stat-sub'},'越大代表制冷效果越好'),
+      el('div',{class:'stat-label'},'当前最优流量均匀性 (CV)'),
+      el('div',{class:'stat-val',style:{color:'var(--green)'}},bestCV!=null?(+bestCV).toFixed(4):'—'),
+      el('div',{class:'stat-sub'},'越小越均匀 · ΔP='+(bestDP!=null?(+bestDP).toFixed(1)+'Pa':'—')+' · obj='+(bestObj!=null?(+bestObj).toFixed(4):'—')),
     ),
     el('div',{class:'stat-card'},
       el('div',{class:'stat-label'},'当前轮次'),
@@ -611,15 +613,23 @@ function renderOptimization(){
 
   if(job.best_params){
     const p=job.best_params
-    const Dmm=p.D!=null?(p.D*1000).toFixed(1):'—'
-    const LD=p.L_D!=null?p.L_D.toFixed(1):'—'
-    const rc=p.r_c!=null?(p.r_c*100).toFixed(1)+'%':'—'
+    const l1=p.logit_1!=null?(+p.logit_1).toFixed(3):null
+    const l2=p.logit_2!=null?(+p.logit_2).toFixed(3):null
+    const l3=p.logit_3!=null?(+p.logit_3).toFixed(3):null
+    const softmax=function(xs){
+      const m=Math.max.apply(null,xs)
+      const ex=xs.map(x=>Math.exp(x-m))
+      const s=ex.reduce((a,b)=>a+b,0)
+      return ex.map(e=>e/s)
+    }
+    const ws=(l1!=null&&l2!=null&&l3!=null)?softmax([+l1,+l2,+l3,0]):null
+    const wTxt=ws?ws.map((w,i)=>`w${i+1}=${(w*100).toFixed(1)}%`).join(' · '):'—'
     twoCol.appendChild(el('div',{class:'best-card'},
       el('div',{class:'best-title'},'✦ 当前找到的最优设计'),
       el('div',{class:'best-params'},
-        el('div',{class:'best-param'},el('div',{class:'best-param-val'},Dmm),el('div',{class:'best-param-label'},'管径（mm）'),el('div',{class:'best-param-explain'},'主流道直径')),
-        el('div',{class:'best-param'},el('div',{class:'best-param-val'},LD),el('div',{class:'best-param-label'},'长径比 L/D'),el('div',{class:'best-param-explain'},'管长 ÷ 管径')),
-        el('div',{class:'best-param'},el('div',{class:'best-param-val'},rc),el('div',{class:'best-param-label'},'冷端孔径比'),el('div',{class:'best-param-explain'},'冷端开口占管径比例')),
+        el('div',{class:'best-param'},el('div',{class:'best-param-val'},l1??'—'),el('div',{class:'best-param-label'},'logit_1'),el('div',{class:'best-param-explain'},'出口开口分配参数')),
+        el('div',{class:'best-param'},el('div',{class:'best-param-val'},l2??'—'),el('div',{class:'best-param-label'},'logit_2'),el('div',{class:'best-param-explain'},'出口开口分配参数')),
+        el('div',{class:'best-param'},el('div',{class:'best-param-val'},l3??'—'),el('div',{class:'best-param-label'},'logit_3'),el('div',{class:'best-param-explain'},wTxt)),
       ),
     ))
   }else{
@@ -630,7 +640,7 @@ function renderOptimization(){
   }
 
   const trendCard=el('div',{class:'trend-wrap'})
-  trendCard.appendChild(el('div',{class:'trend-explain',html:'<b>优化收敛曲线</b> — 每个点代表一批仿真完成后当前最优结果。<b>曲线持续上升说明 AI 正在找到更好的设计。</b>'}))
+  trendCard.appendChild(el('div',{class:'trend-explain',html:'<b>优化收敛曲线</b> — 每个点代表一批仿真完成后当前最优目标值。<b>曲线持续上升说明 AI 正在找到更好的分流设计。</b>'}))
   const trendCanvas=el('canvas',{style:{width:'100%',height:'140px'}})
   trendCanvas.width=600
   trendCanvas.height=140
@@ -640,7 +650,7 @@ function renderOptimization(){
 
   if(job.history&&job.history.length>1){
     const scatterWrap=el('div',{class:'scatter-wrap',style:{marginTop:'20px'}})
-    scatterWrap.appendChild(el('div',{class:'scatter-explain',html:'<b>参数空间探索图（管径 vs 长径比）</b> — 每个点代表一个已测试的方案。<b>越亮绿的点冷端温降越高</b>（制冷效果越好）。AI 通过这些数据推断下一步去哪里探索。'}))
+    scatterWrap.appendChild(el('div',{class:'scatter-explain',html:'<b>参数空间探索图（logit_1 vs logit_2）</b> — 每个点代表一个已测试的方案。<b>越亮绿的点目标值越高</b>（分流更好）。'}))
     const sc=el('canvas',{style:{width:'100%',height:'200px'}})
     sc.width=800
     sc.height=200
@@ -708,29 +718,29 @@ function drawScatter(canvas,history){
   ctx.clearRect(0,0,W,H)
   const pts=[]
   for(const r of history){
-    if(r.params&&r.params.D!=null&&r.params.L_D!=null&&r.objective!=null&&isFinite(r.objective))pts.push(r)
+    if(r.params&&r.params.logit_1!=null&&r.params.logit_2!=null&&r.objective!=null&&isFinite(r.objective))pts.push(r)
   }
   if(pts.length===0)return
-  const Ds=pts.map(function(r){return r.params.D*1000})
-  const LDs=pts.map(function(r){return r.params.L_D})
+  const xs=pts.map(function(r){return r.params.logit_1})
+  const ys=pts.map(function(r){return r.params.logit_2})
   const objs=pts.map(function(r){return r.objective})
-  const mnD=Math.min.apply(null,Ds),mxD=Math.max.apply(null,Ds)
-  const mnL=Math.min.apply(null,LDs),mxL=Math.max.apply(null,LDs)
+  const mnX=Math.min.apply(null,xs),mxX=Math.max.apply(null,xs)
+  const mnY=Math.min.apply(null,ys),mxY=Math.max.apply(null,ys)
   const mnO=Math.min.apply(null,objs),mxO=Math.max.apply(null,objs)
   const pad={l:30,r:20,t:10,b:30}
   const W_=W-pad.l-pad.r,H_=H-pad.t-pad.b
-  const toX=function(d){return pad.l+((d-mnD)/(Math.max(mxD-mnD,1)))*W_}
-  const toY=function(l){return pad.t+H_-((l-mnL)/(Math.max(mxL-mnL,1)))*H_}
+  const toX=function(v){return pad.l+((v-mnX)/(Math.max(mxX-mnX,1)))*W_}
+  const toY=function(v){return pad.t+H_-((v-mnY)/(Math.max(mxY-mnY,1)))*H_}
   ctx.fillStyle='rgba(255,255,255,0.35)'
   ctx.font='11px system-ui'
-  ctx.fillText('管径 (mm) →',W_/2+pad.l-30,H-4)
+  ctx.fillText('logit_1 →',W_/2+pad.l-20,H-4)
   ctx.save()
   ctx.translate(12,H_/2+pad.t+20)
   ctx.rotate(-Math.PI/2)
-  ctx.fillText('长径比 L/D →',0,0)
+  ctx.fillText('logit_2 →',0,0)
   ctx.restore()
   pts.forEach(function(_,i){
-    const x=toX(Ds[i]),y=toY(LDs[i])
+    const x=toX(xs[i]),y=toY(ys[i])
     const t=(objs[i]-mnO)/(Math.max(mxO-mnO,1))
     const r_=Math.round(99+(74-99)*t)
     const g_=Math.round(102+(222-102)*t)
@@ -743,7 +753,7 @@ function drawScatter(canvas,history){
   })
   const bestIdx=objs.indexOf(Math.max.apply(null,objs))
   ctx.beginPath()
-  ctx.arc(toX(Ds[bestIdx]),toY(LDs[bestIdx]),8,0,Math.PI*2)
+  ctx.arc(toX(xs[bestIdx]),toY(ys[bestIdx]),8,0,Math.PI*2)
   ctx.strokeStyle='rgba(74,222,128,0.9)'
   ctx.lineWidth=2
   ctx.stroke()

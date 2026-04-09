@@ -16,6 +16,15 @@ cd manifold-cfd-opt
 python run_optimizer.py --config config_remote_openfoam.yaml
 ```
 
+## 监控面板（本地）
+
+默认端口为 `8090`（可用 `MONITOR_PORT` 覆盖）：
+
+```bash
+cd manifold-cfd-opt
+VORTEX_ROOT=. VORTEX_CONFIG=config_agent_remote_openfoam_local.yaml MONITOR_HOST=127.0.0.1 MONITOR_PORT=8090 python monitor/run_server.py
+```
+
 ## 参数化空间（当前模板）
 
 当前 `templates/manifold_2d` 使用 4 个出口开口高度的 softmax 参数化：
@@ -30,4 +39,3 @@ python run_optimizer.py --config config_remote_openfoam.yaml
 
 - OpenFOAM 模板：[templates/manifold_2d](file:///d:/TRAE/manifold-cfd-opt/templates/manifold_2d)
 - 结果提取：通过 `surfaceFieldValue` functionObject 输出各 outlet 的 `sum(phi)` 与 `areaWeightedAverage(p)`，优化器读取最后一次写出的值计算 `cv` 与 `ΔP`。
-

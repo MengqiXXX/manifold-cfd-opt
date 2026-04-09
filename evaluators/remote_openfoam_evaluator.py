@@ -6,7 +6,6 @@ import shutil
 import tarfile
 import tempfile
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -81,8 +80,8 @@ def _derive_mesh_params(params: DesignParams, outlet_count: int = 4) -> dict:
         "n_cells_x": 120,
         "n_cells_y": n_cells_y,
         "n_cells_z": 1,
-        "end_time": 800,
-        "write_interval": 200,
+        "end_time": 300,
+        "write_interval": 100,
     }
 
 
@@ -91,6 +90,10 @@ def _ssh_exec(ssh: paramiko.SSHClient, cmd: str, timeout: int) -> tuple[int, str
     out = stdout.read().decode("utf-8", errors="replace")
     err = stderr.read().decode("utf-8", errors="replace")
     return stdout.channel.recv_exit_status(), out, err
+
+
+def _is_localhost(host: str) -> bool:
+    return host in {"127.0.0.1", "localhost", "::1"}
 
 
 def _latest_value_from_surface_field_value(ssh: paramiko.SSHClient, case_dir: str, func_name: str, timeout: int) -> float | None:
@@ -105,6 +108,25 @@ def _latest_value_from_surface_field_value(ssh: paramiko.SSHClient, case_dir: st
     )
     code, out, _ = _ssh_exec(ssh, cmd, timeout=timeout)
     if code != 0:
+        return None
+
+
+def _latest_value_from_surface_field_value_local(case_dir: str, func_name: str) -> float | None:
+    try:
+        pp = Path(case_dir) / "postProcessing" / func_name
+        if not pp.exists():
+            return None
+        candidates = sorted(pp.glob("*/*.dat"), key=lambda p: p.stat().st_mtime)
+        if not candidates:
+            return None
+        line = candidates[-1].read_text(encoding="utf-8", errors="replace").strip().splitlines()
+        if not line:
+            return None
+        last = line[-1].strip().split()
+        if not last:
+            return None
+        return float(last[-1])
+    except Exception:
         return None
     try:
         return float(out.strip().splitlines()[-1])
@@ -129,7 +151,18 @@ class RemoteOpenFOAMEvaluator(Evaluator):
     def _connect(self) -> paramiko.SSHClient:
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(self.ssh_host, port=self.ssh_port, username=self.ssh_user, timeout=15)
+        ssh.connect(
+            self.ssh_host,
+            port=self.ssh_port,
+            username=self.ssh_user,
+            timeout=15,
+            banner_timeout=30,
+            auth_timeout=30,
+        )
+        try:
+            ssh.get_transport().set_keepalive(30)
+        except Exception:
+            pass
         return ssh
 
     def _upload_case(self, ssh: paramiko.SSHClient, local_case: Path, remote_case: str) -> None:
@@ -178,6 +211,28 @@ class RemoteOpenFOAMEvaluator(Evaluator):
         code, out, err = _ssh_exec(ssh, cmd, timeout=timeout)
         return code == 0 and "DONE" in out, out + "\n" + err
 
+    def _run_case_local(self, remote_case_dir: str, timeout: int) -> tuple[bool, str]:
+        import subprocess
+
+        solver_cmd = "simpleFoam"
+        cmd = (
+            f"bash -lc 'set -euo pipefail; "
+            f"source {self.foam_source}; "
+            f"cd {remote_case_dir}; "
+            "blockMesh > log.blockMesh 2>&1; "
+            "checkMesh > log.checkMesh 2>&1; "
+            "decomposePar -force > log.decomposePar 2>&1; "
+            f"mpirun -np {int(self.n_cores)} {solver_cmd} -parallel > log.solver 2>&1; "
+            "reconstructPar -latestTime > log.reconstructPar 2>&1; "
+            "echo DONE'"
+        )
+        try:
+            proc = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+            out = (proc.stdout or "") + "\n" + (proc.stderr or "")
+            return proc.returncode == 0 and "DONE" in out, out
+        except Exception as e:
+            return False, f"{type(e).__name__}: {e}"
+
     def evaluate_one(self, params: DesignParams) -> EvalResult:
         t0 = time.perf_counter()
         ctx = _derive_mesh_params(params=params, outlet_count=4)
@@ -193,10 +248,17 @@ class RemoteOpenFOAMEvaluator(Evaluator):
 
             ssh = None
             try:
-                ssh = self._connect()
-                self._upload_case(ssh, local_case=local_case, remote_case=remote_case_root)
+                if _is_localhost(self.ssh_host):
+                    remote_case_root = str(Path(self.remote_base).expanduser() / run_tag)
+                    remote_case_dir = str(Path(remote_case_root) / "case")
+                    _render_template_dir(Path(self.template_dir), Path(remote_case_dir), ctx)
+                    logs = ""
+                    ok, logs = self._run_case_local(remote_case_dir=remote_case_dir, timeout=self.timeout)
+                else:
+                    ssh = self._connect()
+                    self._upload_case(ssh, local_case=local_case, remote_case=remote_case_root)
+                    ok, logs = self._run_case(ssh, remote_case_dir=remote_case_dir, timeout=self.timeout)
 
-                ok, logs = self._run_case(ssh, remote_case_dir=remote_case_dir, timeout=self.timeout)
                 if not ok:
                     return EvalResult(
                         params=params,
@@ -211,8 +273,12 @@ class RemoteOpenFOAMEvaluator(Evaluator):
                 flows = []
                 outlet_ps = []
                 for name in ctx["outlet_names"]:
-                    f = _latest_value_from_surface_field_value(ssh, remote_case_dir, f"{name}Flow", timeout=self.timeout)
-                    p = _latest_value_from_surface_field_value(ssh, remote_case_dir, f"{name}P", timeout=self.timeout)
+                    if _is_localhost(self.ssh_host):
+                        f = _latest_value_from_surface_field_value_local(remote_case_dir, f"{name}Flow")
+                        p = _latest_value_from_surface_field_value_local(remote_case_dir, f"{name}P")
+                    else:
+                        f = _latest_value_from_surface_field_value(ssh, remote_case_dir, f"{name}Flow", timeout=self.timeout)
+                        p = _latest_value_from_surface_field_value(ssh, remote_case_dir, f"{name}P", timeout=self.timeout)
                     if f is None or p is None:
                         return EvalResult(
                             params=params,
@@ -226,7 +292,10 @@ class RemoteOpenFOAMEvaluator(Evaluator):
                     flows.append(float(f))
                     outlet_ps.append(float(p))
 
-                inlet_p = _latest_value_from_surface_field_value(ssh, remote_case_dir, "inletP", timeout=self.timeout)
+                if _is_localhost(self.ssh_host):
+                    inlet_p = _latest_value_from_surface_field_value_local(remote_case_dir, "inletP")
+                else:
+                    inlet_p = _latest_value_from_surface_field_value(ssh, remote_case_dir, "inletP", timeout=self.timeout)
                 if inlet_p is None:
                     inlet_p = 0.0
 
@@ -259,16 +328,13 @@ class RemoteOpenFOAMEvaluator(Evaluator):
 
     def evaluate_batch(self, params_list: list[DesignParams]) -> list[EvalResult]:
         results: list[EvalResult] = []
-        with ThreadPoolExecutor(max_workers=min(8, len(params_list))) as ex:
-            futs = {ex.submit(self.evaluate_one, p): i for i, p in enumerate(params_list)}
-            ordered: list[EvalResult | None] = [None] * len(params_list)
-            for fut in as_completed(futs):
-                i = futs[fut]
-                try:
-                    ordered[i] = fut.result()
-                except Exception as e:
-                    ordered[i] = EvalResult(
-                        params=params_list[i],
+        for p in params_list:
+            try:
+                results.append(self.evaluate_one(p))
+            except Exception as e:
+                results.append(
+                    EvalResult(
+                        params=p,
                         flow_cv=float("nan"),
                         pressure_drop=float("nan"),
                         converged=False,
@@ -276,7 +342,5 @@ class RemoteOpenFOAMEvaluator(Evaluator):
                         status="ERROR",
                         metadata={"error": f"{type(e).__name__}: {e}"},
                     )
-        for r in ordered:
-            if r is not None:
-                results.append(r)
+                )
         return results
