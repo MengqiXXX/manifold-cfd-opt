@@ -7,7 +7,7 @@ import uvicorn
 
 def main() -> None:
     host = os.getenv("MONITOR_HOST", "0.0.0.0")
-    port = int(os.getenv("MONITOR_PORT", "8088"))
+    port = int(os.getenv("MONITOR_PORT", "8090"))
     uvicorn.run("monitor.main:app", host=host, port=port, reload=False)
 
 
