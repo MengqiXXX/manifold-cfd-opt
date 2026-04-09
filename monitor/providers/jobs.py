@@ -61,31 +61,57 @@ def _query_db_summary(db_path: Path) -> dict[str, Any] | None:
         conn = sqlite3.connect(str(db_path))
         conn.row_factory = sqlite3.Row
         try:
+            cols = {
+                str(r["name"])
+                for r in conn.execute("PRAGMA table_info(results)").fetchall()
+                if r and "name" in r.keys()
+            }
             row_n = conn.execute("SELECT COUNT(*) AS n FROM results").fetchone()
             n = int(row_n["n"]) if row_n else 0
             row_last = conn.execute("SELECT created_at FROM results ORDER BY id DESC LIMIT 1").fetchone()
             last_ts = row_last["created_at"] if row_last else None
-            row_best = conn.execute(
-                """
-                SELECT D, L_D, r_c,
-                       COALESCE(delta_T, efficiency) AS objective,
-                       created_at
-                FROM results
-                WHERE converged=1 AND status='OK' AND COALESCE(delta_T, efficiency) IS NOT NULL
-                ORDER BY COALESCE(delta_T, efficiency) DESC
-                LIMIT 1
-                """
-            ).fetchone()
             best: dict[str, Any] | None = None
-            if row_best:
-                obj = row_best["objective"]
-                best = {
-                    "D": float(row_best["D"]),
-                    "L_D": float(row_best["L_D"]),
-                    "r_c": float(row_best["r_c"]),
-                    "objective": float(obj) if obj is not None else math.nan,
-                    "createdAt": row_best["created_at"],
-                }
+
+            if "objective" in cols and "logit_1" in cols:
+                row_best = conn.execute(
+                    """
+                    SELECT logit_1, logit_2, logit_3, objective, created_at
+                    FROM results
+                    WHERE converged=1 AND status='OK' AND objective IS NOT NULL
+                    ORDER BY objective DESC
+                    LIMIT 1
+                    """
+                ).fetchone()
+                if row_best:
+                    best = {
+                        "logit_1": float(row_best["logit_1"]),
+                        "logit_2": float(row_best["logit_2"]),
+                        "logit_3": float(row_best["logit_3"]),
+                        "objective": float(row_best["objective"]) if row_best["objective"] is not None else math.nan,
+                        "createdAt": row_best["created_at"],
+                    }
+            else:
+                row_best = conn.execute(
+                    """
+                    SELECT D, L_D, r_c,
+                           COALESCE(delta_T, efficiency) AS objective,
+                           created_at
+                    FROM results
+                    WHERE converged=1 AND status='OK' AND COALESCE(delta_T, efficiency) IS NOT NULL
+                    ORDER BY COALESCE(delta_T, efficiency) DESC
+                    LIMIT 1
+                    """
+                ).fetchone()
+                if row_best:
+                    obj = row_best["objective"]
+                    best = {
+                        "D": float(row_best["D"]),
+                        "L_D": float(row_best["L_D"]),
+                        "r_c": float(row_best["r_c"]),
+                        "objective": float(obj) if obj is not None else math.nan,
+                        "createdAt": row_best["created_at"],
+                    }
+
             return {"evaluated": n, "lastCreatedAt": last_ts, "best": best}
         finally:
             conn.close()
