@@ -80,8 +80,8 @@ def _derive_mesh_params(params: DesignParams, outlet_count: int = 4) -> dict:
         "n_cells_x": 120,
         "n_cells_y": n_cells_y,
         "n_cells_z": 1,
-        "end_time": 800,
-        "write_interval": 200,
+        "end_time": 300,
+        "write_interval": 100,
     }
 
 
