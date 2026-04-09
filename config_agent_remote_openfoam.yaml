@@ -27,7 +27,7 @@ timeout_s: 1200
 ssh_host: 127.0.0.1
 ssh_user: liumq
 ssh_port: 22
-remote_base: ~/manifold_cases
+remote_base: /home/liumq/manifold_cases
 
 # Qwen（服务器本机 vLLM OpenAI compatible）
 llm_base_url: "http://127.0.0.1:8001/v1"
