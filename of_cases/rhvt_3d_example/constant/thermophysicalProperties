@@ -1,0 +1,45 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  thermophysicalProperties — 理想气体空气（rhoPimpleFoam）
+  REF2: 可压缩能量方程使用 sensibleEnthalpy，hePsiThermo + perfectGas
+  注：能量变量选择（h vs e vs Et）对能量分离结果影响极大（REF2 核心结论）
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       dictionary;
+    object      thermophysicalProperties;
+}
+
+thermoType
+{
+    type            hePsiThermo;
+    mixture         pureMixture;
+    transport       sutherland;     // Sutherland 黏度（适合高速可压缩流）
+    thermo          janaf;          // JANAF 多项式比热（宽温度范围准确）
+    equationOfState perfectGas;     // 理想气体状态方程
+    specie          specie;
+    energy          sensibleEnthalpy;   // REF2: 用焓而非内能，能量分离预测更准
+}
+
+mixture
+{
+    specie
+    {
+        molWeight       28.9;       // 空气摩尔质量 [g/mol]
+    }
+    thermodynamics
+    {
+        // JANAF 系数（空气，标准值）
+        Tlow            200;
+        Thigh           6000;
+        Tcommon         1000;
+        highCpCoeffs    ( 3.57304 -4.35511e-04  1.44854e-06 -3.25916e-10  2.88e-14 -9.60100e+03  3.12 );
+        lowCpCoeffs     ( 3.09589  1.22835e-03 -4.14267e-07  6.56017e-11 -3.87373e-15 -9.83591e+02  5.34 );
+    }
+    transport
+    {
+        // Sutherland 黏度参数（空气标准值）
+        As              1.458e-06;  // [kg/(m·s·K^0.5)]
+        Ts              110.4;      // Sutherland 温度 [K]
+    }
+}

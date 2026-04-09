@@ -1,0 +1,20 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  turbulenceProperties — k-ω SST（REF2 使用 k-ε 和 k-ω SST 对比）
+  kOmegaSST 在强旋转流中通常比 kEpsilon 更稳健（近壁处理更好）
+  REF1 建议：湍流强度从低值（3%）开始，逐步增大，避免发散
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       dictionary;
+    object      turbulenceProperties;
+}
+
+simulationType      RAS;
+
+RAS
+{
+    RASModel        kOmegaSST;
+    turbulence      on;
+    printCoeffs     on;
+}

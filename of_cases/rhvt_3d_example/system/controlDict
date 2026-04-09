@@ -1,0 +1,87 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  controlDict — rhoPimpleFoam 瞬态，涡流管 3D 示例
+  运行参数：t_end=0.01s，maxCo=0.3（REF1 建议保守起步）
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+
+application     rhoPimpleFoam;
+
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         0.01;
+
+deltaT              1e-7;
+adjustTimeStep      yes;
+maxCo               0.3;
+maxDeltaT           1e-5;
+
+writeControl        adjustableRunTime;
+writeInterval       0.002;
+purgeWrite          3;
+writeFormat         ascii;
+writePrecision      8;
+writeCompression    off;
+timeFormat          general;
+timePrecision       8;
+runTimeModifiable   true;
+
+functions
+{
+    coldEndAvg
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    timeStep;
+        writeInterval   50;
+        operation       areaWeightedAverage;
+        regionType      patch;
+        name            coldEnd;
+        fields          ( T p );
+    }
+
+    hotEndAvg
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    timeStep;
+        writeInterval   50;
+        operation       areaWeightedAverage;
+        regionType      patch;
+        name            hotEnd;
+        fields          ( T p );
+    }
+
+    residuals
+    {
+        type            solverInfo;
+        libs            ("libutilityFunctionObjects.so");
+        writeControl    timeStep;
+        writeInterval   10;
+        fields          ( p U T k omega );
+    }
+
+    midPlane
+    {
+        type            surfaces;
+        libs            ("libsampling.so");
+        writeControl    writeTime;
+        surfaceFormat   vtk;
+        fields          ( T p U );
+        surfaces
+        (
+            yMid
+            {
+                type        cuttingPlane;
+                point       (0 0 0);
+                normal      (0 1 0);
+                interpolate true;
+            }
+        );
+    }
+}

@@ -1,0 +1,117 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+
+convertToMeters 1;
+
+vertices
+(
+{% set N = outlet_count %}
+{% set n = N + 1 %}
+{% set z0 = 0.0 %}
+{% set z1 = thickness %}
+{% for j in range(n) %}
+    (0 {{ "%.10g"|format(y_levels[j]) }} {{ z0 }})
+{% endfor %}
+{% for j in range(n) %}
+    ({{ "%.10g"|format(L) }} {{ "%.10g"|format(y_levels[j]) }} {{ z0 }})
+{% endfor %}
+{% for j in range(n) %}
+    (0 {{ "%.10g"|format(y_levels[j]) }} {{ z1 }})
+{% endfor %}
+{% for j in range(n) %}
+    ({{ "%.10g"|format(L) }} {{ "%.10g"|format(y_levels[j]) }} {{ z1 }})
+{% endfor %}
+);
+
+blocks
+(
+{% set off_x0_z0 = 0 %}
+{% set off_x1_z0 = n %}
+{% set off_x0_z1 = 2*n %}
+{% set off_x1_z1 = 3*n %}
+{% for i in range(N) %}
+    hex (
+        {{ off_x0_z0 + i }}
+        {{ off_x1_z0 + i }}
+        {{ off_x1_z0 + i + 1 }}
+        {{ off_x0_z0 + i + 1 }}
+        {{ off_x0_z1 + i }}
+        {{ off_x1_z1 + i }}
+        {{ off_x1_z1 + i + 1 }}
+        {{ off_x0_z1 + i + 1 }}
+    )
+    ({{ n_cells_x }} {{ n_cells_y[i] }} {{ n_cells_z }})
+    simpleGrading (1 1 1)
+{% endfor %}
+);
+
+edges
+(
+);
+
+boundary
+(
+    inlet
+    {
+        type patch;
+        faces
+        (
+{% for i in range(N) %}
+            ({{ off_x0_z0 + i }} {{ off_x0_z0 + i + 1 }} {{ off_x0_z1 + i + 1 }} {{ off_x0_z1 + i }})
+{% endfor %}
+        );
+    }
+
+{% for i in range(N) %}
+    {{ outlet_names[i] }}
+    {
+        type patch;
+        faces
+        (
+            ({{ off_x1_z0 + i }} {{ off_x1_z1 + i }} {{ off_x1_z1 + i + 1 }} {{ off_x1_z0 + i + 1 }})
+        );
+    }
+{% endfor %}
+
+    walls
+    {
+        type wall;
+        faces
+        (
+            ({{ off_x0_z0 + 0 }} {{ off_x1_z0 + 0 }} {{ off_x1_z1 + 0 }} {{ off_x0_z1 + 0 }})
+            ({{ off_x0_z0 + N }} {{ off_x0_z1 + N }} {{ off_x1_z1 + N }} {{ off_x1_z0 + N }})
+        );
+    }
+
+    front
+    {
+        type empty;
+        faces
+        (
+{% for i in range(N) %}
+            ({{ off_x0_z0 + i }} {{ off_x1_z0 + i }} {{ off_x1_z0 + i + 1 }} {{ off_x0_z0 + i + 1 }})
+{% endfor %}
+        );
+    }
+
+    back
+    {
+        type empty;
+        faces
+        (
+{% for i in range(N) %}
+            ({{ off_x0_z1 + i }} {{ off_x0_z1 + i + 1 }} {{ off_x1_z1 + i + 1 }} {{ off_x1_z1 + i }})
+{% endfor %}
+        );
+    }
+);
+
+mergePatchPairs
+(
+);
+

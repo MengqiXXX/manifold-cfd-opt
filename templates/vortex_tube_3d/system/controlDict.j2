@@ -1,0 +1,126 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  OpenFOAM controlDict — rhoPimpleFoam 瞬态可压缩（涡流管 3D）
+  基于 REF1 (Prajit/FOSSEE) 建议：瞬态推进 + Co 数自适应时间步
+  参考文献：
+    REF1: Prajit, FOSSEE/IIT Bombay, OpenFOAM 3D Vortex Tube Case Study
+    REF2: Burazer et al., Thermal Science 2017, TSCI160223195B
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+
+application     rhoPimpleFoam;
+
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         {{ t_end }};
+
+// 自适应时间步：由 maxCo 控制（REF1 强调 Co 是稳定性关键）
+deltaT              1e-7;
+adjustTimeStep      yes;
+maxCo               {{ max_co }};       // 建议从 0.3 开始，稳定后可提高到 0.5
+maxDeltaT           1e-5;
+
+writeControl        adjustableRunTime;
+writeInterval       {{ write_interval }};
+purgeWrite          3;
+writeFormat         ascii;
+writePrecision      8;
+writeCompression    off;
+timeFormat          general;
+timePrecision       8;
+runTimeModifiable   true;
+
+functions
+{
+    // ── 冷热端面积加权平均温度/压力（能量分离主要指标）──────────────────
+    coldEndAvg
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    timeStep;
+        writeInterval   50;
+        operation       areaWeightedAverage;
+        regionType      patch;
+        name            coldEnd;
+        fields          ( T p );
+    }
+
+    hotEndAvg
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    timeStep;
+        writeInterval   50;
+        operation       areaWeightedAverage;
+        regionType      patch;
+        name            hotEnd;
+        fields          ( T p );
+    }
+
+    inletAvg
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    timeStep;
+        writeInterval   50;
+        operation       areaWeightedAverage;
+        regionType      patch;
+        name            inlet;
+        fields          ( T p U );
+    }
+
+    // ── 质量流量（用于验证质量守恒）─────────────────────────────────────
+    massFlow
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    timeStep;
+        writeInterval   50;
+        operation       sum;
+        regionType      patch;
+        name            inlet;
+        fields          ( phi );
+    }
+
+    // ── 残差监控 ─────────────────────────────────────────────────────────
+    residuals
+    {
+        type            solverInfo;
+        libs            ("libutilityFunctionObjects.so");
+        writeControl    timeStep;
+        writeInterval   10;
+        fields          ( p U T k omega );
+    }
+
+    // ── 轴向截面温度云图采样（用于观察能量分离发展）─────────────────────
+    midPlane
+    {
+        type            surfaces;
+        libs            ("libsampling.so");
+        writeControl    writeTime;
+        surfaceFormat   vtk;
+        fields          ( T p U );
+        surfaces
+        (
+            zMid
+            {
+                type    cuttingPlane;
+                point   (0 0 {{ "%.6f"|format(L * 0.5) }});
+                normal  (0 0 1);
+                interpolate true;
+            }
+            yMid
+            {
+                type    cuttingPlane;
+                point   (0 0 0);
+                normal  (0 1 0);
+                interpolate true;
+            }
+        );
+    }
+}

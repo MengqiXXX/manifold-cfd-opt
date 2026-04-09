@@ -1,0 +1,78 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  OpenFOAM blockMeshDict — 涡流管 2D 楔形轴对称网格
+  参数: D={{ "%.4f"|format(D) }}m, L={{ "%.4f"|format(L) }}m, r_c={{ "%.4f"|format(r_c) }}m
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+
+scale   1;
+
+// 楔角 1°，顶点在 r=0 轴处合并
+// 坐标系: x=r(径向), y=azimuthal(楔向), z=轴向
+vertices
+(
+    // 冷端截面 z=0
+    ( 0          0          0       )  // 0: 轴心冷端
+    ( {{ "%.6f"|format(R) }}   {{ "%.6f"|format(y_neg) }}  0 )  // 1: 壁面冷端 -y
+    ( {{ "%.6f"|format(R) }}   {{ "%.6f"|format(y_pos) }}  0 )  // 2: 壁面冷端 +y
+    ( 0          0          0       )  // 3: 轴心冷端（楔形退化）
+
+    // 热端截面 z=L
+    ( 0          0          {{ "%.6f"|format(L) }} )  // 4: 轴心热端
+    ( {{ "%.6f"|format(R) }}   {{ "%.6f"|format(y_neg) }}  {{ "%.6f"|format(L) }} )  // 5: 壁面热端 -y
+    ( {{ "%.6f"|format(R) }}   {{ "%.6f"|format(y_pos) }}  {{ "%.6f"|format(L) }} )  // 6: 壁面热端 +y
+    ( 0          0          {{ "%.6f"|format(L) }} )  // 7: 轴心热端（楔形退化）
+);
+
+blocks
+(
+    // 单块：r 方向 n_r 格，z 方向 n_z 格，azimuthal 方向 1 格
+    hex (0 1 2 3 4 5 6 7)
+    ( {{ n_r }} 1 {{ n_z }} )
+    simpleGrading
+    (
+        4      // r 方向：壁面加密（4倍渐变）
+        1      // azimuthal
+        1      // z 方向均匀
+    )
+);
+
+edges   ();
+
+boundary
+(
+    coldEnd
+    {
+        type    patch;
+        faces   ( (0 3 2 1) );   // z=0 冷端面
+    }
+    hotEnd
+    {
+        type    patch;
+        faces   ( (4 5 6 7) );   // z=L 热端面
+    }
+    wall
+    {
+        type    wall;
+        faces   ( (1 2 6 5) );   // r=R 壁面
+    }
+    axis
+    {
+        type    empty;
+        faces   ( (0 4 7 3) );   // r=0 轴
+    }
+    front
+    {
+        type    wedge;
+        faces   ( (0 1 5 4) );
+    }
+    back
+    {
+        type    wedge;
+        faces   ( (3 2 6 7) );
+    }
+);

@@ -1,0 +1,14 @@
+/*  k — 湍动能
+    I=5%, U_ref=100 m/s → k = 1.5*(0.05*100)^2 = 37.5 m²/s²
+    REF1: 从低湍流强度起步，此处 I=5% 属保守值
+*/
+FoamFile { format ascii; class volScalarField; object k; }
+dimensions      [ 0 2 -2 0 0 0 0 ];
+internalField   uniform 37.5;
+boundaryField
+{
+    inlet    { type turbulentIntensityKineticEnergyInlet; intensity 0.05; value uniform 37.5; }
+    coldEnd  { type inletOutlet; inletValue uniform 37.5; value uniform 37.5; }
+    hotEnd   { type inletOutlet; inletValue uniform 37.5; value uniform 37.5; }
+    wall     { type kqRWallFunction; value uniform 37.5; }
+}

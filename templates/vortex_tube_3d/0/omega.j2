@@ -1,0 +1,15 @@
+/*  omega — 比耗散率（k-ω SST）
+    omega_in = k^0.5 / (C_mu^0.25 * L_t)
+    L_t = 0.07 * D_h，D_h = 2*(R - r_c)（入口环形液压直径）
+    omega_in = {{ omega_in }}  [1/s]
+*/
+FoamFile { format ascii; class volScalarField; object omega; }
+dimensions      [ 0 0 -1 0 0 0 0 ];
+internalField   uniform {{ omega_in }};
+boundaryField
+{
+    inlet    { type turbulentMixingLengthFrequencyInlet; mixingLength {{ mix_length }}; value uniform {{ omega_in }}; }
+    coldEnd  { type inletOutlet; inletValue uniform {{ omega_in }}; value uniform {{ omega_in }}; }
+    hotEnd   { type inletOutlet; inletValue uniform {{ omega_in }}; value uniform {{ omega_in }}; }
+    wall     { type omegaWallFunction; value uniform {{ omega_in }}; }
+}

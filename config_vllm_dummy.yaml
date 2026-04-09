@@ -1,0 +1,23 @@
+# 最小可运行配置：直连 vLLM + dummy evaluator（用于验证 LangGraph/BO/DB/LLM 连接）
+
+evaluator: dummy
+
+n_initial: 2
+n_iterations: 1
+batch_size: 2
+
+bounds:
+  D:    [0.015, 0.05]
+  L_D:  [5.0,   20.0]
+  r_c:  [0.15,  0.45]
+
+db_path: results_dummy.sqlite
+csv_output: results_dummy.csv
+report_path: optimization_report_dummy.md
+
+llm_base_url: "http://127.0.0.1:8001/v1"
+llm_api_key: "dummy"
+llm_model: "qwen2.5-72b"
+
+dummy_noise: 0.0
+dummy_sleep_s: 0.0

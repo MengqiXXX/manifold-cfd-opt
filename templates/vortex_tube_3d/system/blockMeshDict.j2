@@ -1,0 +1,148 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  OpenFOAM blockMeshDict — 3D Ranque-Hilsch Vortex Tube
+  O-grid 5-block cylinder:  center block + 4 outer arc blocks
+  Patches:
+    coldEnd  — 冷端出口（z=0 中心, r < r_c）
+    inlet    — 入口环形截面（z=0 外环, r_c < r < R）
+    hotEnd   — 热端出口（z=L 全截面）
+    wall     — 外壁（r = R 侧面）
+  参数（由 generate_case.py 渲染）：
+    R    = {{ "%.6f"|format(R) }}   管内径 [m]
+    r_c  = {{ "%.6f"|format(r_c) }}   冷端孔径 [m]
+    L    = {{ "%.6f"|format(L) }}   管长 [m]
+    a    = r_c/√2 = {{ "%.6f"|format(a) }}   内方格半宽 [m]
+    R2   = R/√2  = {{ "%.6f"|format(R2) }}   外顶点半径投影 [m]
+    n_c  = {{ n_c }}   周向每块格数
+    n_r  = {{ n_r }}   外块径向格数（向壁面加密）
+    n_z  = {{ n_z }}   轴向格数
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+
+scale   1;
+
+// ─── 顶点定义（16点：z=0 面 0-7，z=L 面 8-15）─────────────────────────────
+// 内方格顶点（r = a√2 ≈ r_c 处）
+// 外圆顶点在圆上 45° 倍角处（r = R）
+vertices
+(
+    // z = 0 面
+    ( {{ "% .6f"|format( a)  }} {{ "% .6f"|format(-a)  }} 0 )  // 0 inner SE
+    ( {{ "% .6f"|format( a)  }} {{ "% .6f"|format( a)  }} 0 )  // 1 inner NE
+    ( {{ "% .6f"|format(-a)  }} {{ "% .6f"|format( a)  }} 0 )  // 2 inner NW
+    ( {{ "% .6f"|format(-a)  }} {{ "% .6f"|format(-a)  }} 0 )  // 3 inner SW
+    ( {{ "% .6f"|format( R2) }} {{ "% .6f"|format(-R2) }} 0 )  // 4 outer SE
+    ( {{ "% .6f"|format( R2) }} {{ "% .6f"|format( R2) }} 0 )  // 5 outer NE
+    ( {{ "% .6f"|format(-R2) }} {{ "% .6f"|format( R2) }} 0 )  // 6 outer NW
+    ( {{ "% .6f"|format(-R2) }} {{ "% .6f"|format(-R2) }} 0 )  // 7 outer SW
+    // z = L 面（8 = 0+z, 9 = 1+z, ...）
+    ( {{ "% .6f"|format( a)  }} {{ "% .6f"|format(-a)  }} {{ "%.6f"|format(L) }} )  // 8
+    ( {{ "% .6f"|format( a)  }} {{ "% .6f"|format( a)  }} {{ "%.6f"|format(L) }} )  // 9
+    ( {{ "% .6f"|format(-a)  }} {{ "% .6f"|format( a)  }} {{ "%.6f"|format(L) }} )  // 10
+    ( {{ "% .6f"|format(-a)  }} {{ "% .6f"|format(-a)  }} {{ "%.6f"|format(L) }} )  // 11
+    ( {{ "% .6f"|format( R2) }} {{ "% .6f"|format(-R2) }} {{ "%.6f"|format(L) }} )  // 12
+    ( {{ "% .6f"|format( R2) }} {{ "% .6f"|format( R2) }} {{ "%.6f"|format(L) }} )  // 13
+    ( {{ "% .6f"|format(-R2) }} {{ "% .6f"|format( R2) }} {{ "%.6f"|format(L) }} )  // 14
+    ( {{ "% .6f"|format(-R2) }} {{ "% .6f"|format(-R2) }} {{ "%.6f"|format(L) }} )  // 15
+);
+
+// ─── 5 个六面体块 ──────────────────────────────────────────────────────────
+// 局部坐标方向：hex(v0..v3  v4..v7) → v0→v1=local-x, v0→v3=local-y, v0→v4=local-z
+blocks
+(
+    // Block 0: 中心方格
+    hex (0 1 2 3  8 9 10 11)
+    ( {{ n_c }} {{ n_c }} {{ n_z }} )
+    simpleGrading (1 1 1)
+
+    // Block 1: SE 外块  local-x: 4→5(周向)  local-y: 4→0(径向，从壁到心)
+    hex (4 5 1 0  12 13 9 8)
+    ( {{ n_c }} {{ n_r }} {{ n_z }} )
+    simpleGrading (1 {{ r_grading }} 1)
+
+    // Block 2: NE 外块
+    hex (5 6 2 1  13 14 10 9)
+    ( {{ n_c }} {{ n_r }} {{ n_z }} )
+    simpleGrading (1 {{ r_grading }} 1)
+
+    // Block 3: NW 外块
+    hex (6 7 3 2  14 15 11 10)
+    ( {{ n_c }} {{ n_r }} {{ n_z }} )
+    simpleGrading (1 {{ r_grading }} 1)
+
+    // Block 4: SW 外块
+    hex (7 4 0 3  15 12 8 11)
+    ( {{ n_c }} {{ n_r }} {{ n_z }} )
+    simpleGrading (1 {{ r_grading }} 1)
+);
+
+// ─── 圆弧边（外圆周，z=0 和 z=L 各 4 段）─────────────────────────────────
+edges
+(
+    // z = 0 面弧
+    arc 4 5 ( {{ "% .6f"|format(R) }} 0 0 )          // E 点
+    arc 5 6 ( 0 {{ "% .6f"|format(R) }} 0 )           // N 点
+    arc 6 7 ( {{ "% .6f"|format(-R) }} 0 0 )          // W 点
+    arc 7 4 ( 0 {{ "% .6f"|format(-R) }} 0 )          // S 点
+    // z = L 面弧
+    arc 12 13 ( {{ "% .6f"|format(R) }} 0 {{ "%.6f"|format(L) }} )
+    arc 13 14 ( 0 {{ "% .6f"|format(R) }} {{ "%.6f"|format(L) }} )
+    arc 14 15 ( {{ "% .6f"|format(-R) }} 0 {{ "%.6f"|format(L) }} )
+    arc 15 12 ( 0 {{ "% .6f"|format(-R) }} {{ "%.6f"|format(L) }} )
+);
+
+// ─── 边界 patch 定义 ───────────────────────────────────────────────────────
+boundary
+(
+    coldEnd          // 冷端出口：z=0 面中心块（近似圆形，r ≈ r_c）
+    {
+        type patch;
+        faces
+        (
+            (0 3 2 1)   // center block z=0: CW from +z → outward -z
+        );
+    }
+
+    inlet            // 入口：z=0 面外环（环形，r_c < r < R）
+    {
+        type patch;
+        faces
+        (
+            (0 4 5 1)   // SE outer z=0
+            (1 5 6 2)   // NE outer z=0
+            (2 6 7 3)   // NW outer z=0
+            (3 7 4 0)   // SW outer z=0
+        );
+    }
+
+    hotEnd           // 热端出口：z=L 全截面
+    {
+        type patch;
+        faces
+        (
+            (8 9 10 11)    // center z=L
+            (8 12 13 9)    // SE outer z=L
+            (9 13 14 10)   // NE outer z=L
+            (10 14 15 11)  // NW outer z=L
+            (11 15 12 8)   // SW outer z=L
+        );
+    }
+
+    wall             // 外壁：r=R 侧面（4段弧面）
+    {
+        type wall;
+        faces
+        (
+            (4 5 13 12)   // SE arc
+            (5 6 14 13)   // NE arc
+            (6 7 15 14)   // NW arc
+            (7 4 12 15)   // SW arc
+        );
+    }
+);
+
+mergePatchPairs ();

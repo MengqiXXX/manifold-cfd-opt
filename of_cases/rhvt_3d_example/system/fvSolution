@@ -1,0 +1,77 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  fvSolution — rhoPimpleFoam PIMPLE 瞬态可压缩
+  REF1：低 Co（0.3-0.5）+ 适当内迭代次数保证每时间步收敛
+  REF2：能量方程收敛是能量分离预测的关键
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       dictionary;
+    object      fvSolution;
+}
+
+solvers
+{
+    p
+    {
+        solver          GAMG;
+        smoother        GaussSeidel;
+        tolerance       1e-8;
+        relTol          0.01;
+    }
+
+    pFinal
+    {
+        $p;
+        relTol          0;
+    }
+
+    "(rho|rhoFinal)"
+    {
+        solver          diagonal;
+    }
+
+    "(U|e|h|k|omega)"
+    {
+        solver          smoothSolver;
+        smoother        symGaussSeidel;
+        tolerance       1e-8;
+        relTol          0.01;
+    }
+
+    "(U|e|h|k|omega)Final"
+    {
+        $U;
+        relTol          0;
+    }
+}
+
+PIMPLE
+{
+    nOuterCorrectors        2;    // 外迭代（压力-速度耦合循环）
+    nCorrectors             2;    // 压力修正内循环
+    nNonOrthogonalCorrectors 1;   // 非正交修正（O-grid 网格质量好，1 次足够）
+    transonic               no;
+    consistent              yes;  // SIMPLEC 一致性压力修正
+
+    // 残差收敛判断（可加快计算）
+    outerCorrectorResidualControl
+    {
+        p       { tolerance 1e-4; relTol 0; }
+        U       { tolerance 1e-4; relTol 0; }
+        "(h|e)" { tolerance 1e-4; relTol 0; }
+    }
+}
+
+relaxationFactors
+{
+    // 瞬态计算通常不需要松弛，但强旋转初期可适当加入
+    equations
+    {
+        U       1;
+        h       1;
+        e       1;
+        k       0.7;
+        omega   0.7;
+    }
+}

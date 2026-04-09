@@ -1,0 +1,14 @@
+// 切向入口速度：U_theta 为 y 方向（楔形坐标中近似切向）
+FoamFile { format ascii; class volVectorField; object U; }
+dimensions      [ 0 1 -1 0 0 0 0 ];
+internalField   uniform ( 0 0 0 );
+boundaryField
+{
+    coldEnd  { type pressureInletOutletVelocity; value uniform (0 0 0); }
+    hotEnd   { type pressureInletOutletVelocity; value uniform (0 0 0); }
+    inlet    { type fixedValue; value uniform ( 0 {{ U_theta }} 0 ); }
+    wall     { type noSlip; }
+    axis     { type empty; }
+    front    { type wedge; }
+    back     { type wedge; }
+}

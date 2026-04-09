@@ -1,0 +1,13 @@
+FoamFile { format ascii; class volScalarField; object p; }
+dimensions      [ 1 -1 -2 0 0 0 0 ];
+internalField   uniform {{ p_in }};
+boundaryField
+{
+    coldEnd  { type fixedValue;    value uniform {{ p_cold }}; }
+    hotEnd   { type fixedValue;    value uniform {{ p_hot  }}; }
+    inlet    { type fixedValue;    value uniform {{ p_in   }}; }
+    wall     { type zeroGradient; }
+    axis     { type empty; }
+    front    { type wedge; }
+    back     { type wedge; }
+}

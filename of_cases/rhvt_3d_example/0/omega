@@ -1,0 +1,15 @@
+/*  omega — 比耗散率
+    D_h = 2*(R-r_c) = 2*(0.010-0.005) = 0.010 m
+    L_t = 0.07 * D_h = 7e-4 m
+    omega = sqrt(37.5) / (0.09^0.25 * 7e-4) ≈ 15960 s⁻¹
+*/
+FoamFile { format ascii; class volScalarField; object omega; }
+dimensions      [ 0 0 -1 0 0 0 0 ];
+internalField   uniform 15960;
+boundaryField
+{
+    inlet    { type turbulentMixingLengthFrequencyInlet; mixingLength 7e-4; value uniform 15960; }
+    coldEnd  { type inletOutlet; inletValue uniform 15960; value uniform 15960; }
+    hotEnd   { type inletOutlet; inletValue uniform 15960; value uniform 15960; }
+    wall     { type omegaWallFunction; value uniform 15960; }
+}

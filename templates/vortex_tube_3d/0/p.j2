@@ -1,0 +1,22 @@
+/*  p — 静压场（rhoPimpleFoam）
+    inlet:   totalPressure（给定滞止压力 p0 = p_in）
+    coldEnd: fixedValue（冷端背压）
+    hotEnd:  fixedValue（热端背压）
+    wall:    zeroGradient
+*/
+FoamFile { format ascii; class volScalarField; object p; }
+dimensions      [ 1 -1 -2 0 0 0 0 ];
+internalField   uniform {{ p_hot }};
+boundaryField
+{
+    inlet
+    {
+        // totalPressure: 给定滞止压力，静压由速度自动修正
+        type            totalPressure;
+        p0              uniform {{ p_in }};
+        value           uniform {{ p_in }};
+    }
+    coldEnd  { type fixedValue; value uniform {{ p_cold }}; }
+    hotEnd   { type fixedValue; value uniform {{ p_hot  }}; }
+    wall     { type zeroGradient; }
+}

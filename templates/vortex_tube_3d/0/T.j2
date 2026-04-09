@@ -1,0 +1,16 @@
+/*  T — 温度场
+    REF2: 能量方程边界条件对能量分离预测极为敏感（关键！）
+    出口用 zeroGradient（不限制热量流出），inlet 给定滞止温度
+    若希望观察能量分离，出口必须用 zeroGradient/inletOutlet，
+    不能用 fixedValue（否则人为固定了出口温度）。
+*/
+FoamFile { format ascii; class volScalarField; object T; }
+dimensions      [ 0 0 0 1 0 0 0 ];
+internalField   uniform {{ T_in }};
+boundaryField
+{
+    inlet    { type fixedValue;   value uniform {{ T_in }}; }
+    coldEnd  { type zeroGradient; }    // 让冷端温度自由发展，观察降温
+    hotEnd   { type zeroGradient; }    // 让热端温度自由发展，观察升温
+    wall     { type zeroGradient; }    // 绝热壁（adiabatic）
+}

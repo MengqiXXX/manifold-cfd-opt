@@ -1,0 +1,15 @@
+FoamFile { format ascii; class volScalarField; object p; }
+dimensions      [ 1 -1 -2 0 0 0 0 ];
+internalField   uniform 100000;
+boundaryField
+{
+    inlet
+    {
+        type    totalPressure;
+        p0      uniform 400000;   // 4 bar 滞止压力
+        value   uniform 400000;
+    }
+    coldEnd  { type fixedValue; value uniform 100000; }  // 1 bar 冷端背压
+    hotEnd   { type fixedValue; value uniform 100000; }  // 1 bar 热端背压
+    wall     { type zeroGradient; }
+}

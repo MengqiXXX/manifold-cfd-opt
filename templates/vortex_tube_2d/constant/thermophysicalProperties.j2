@@ -1,0 +1,41 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  OpenFOAM thermophysicalProperties — 理想气体空气（rhoSimpleFoam）
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       dictionary;
+    object      thermophysicalProperties;
+}
+
+thermoType
+{
+    type            hePsiThermo;
+    mixture         pureMixture;
+    transport       sutherland;
+    thermo          janaf;
+    equationOfState perfectGas;
+    specie          specie;
+    energy          sensibleEnthalpy;
+}
+
+mixture
+{
+    specie
+    {
+        molWeight       28.9;
+    }
+    thermodynamics
+    {
+        Tlow            100;
+        Thigh           6000;
+        Tcommon         1000;
+        highCpCoeffs    ( 3.57304 -4.35511e-04  1.44854e-06 -3.25916e-10  2.88e-14  -9.60100e+03  3.12 );
+        lowCpCoeffs     ( 3.09589  1.22835e-03 -4.14267e-07  6.56017e-11 -3.87373e-15 -9.83591e+02  5.34 );
+    }
+    transport
+    {
+        As              1.458e-06;
+        Ts              110.4;
+    }
+}

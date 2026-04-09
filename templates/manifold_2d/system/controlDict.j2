@@ -1,0 +1,63 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+
+application     simpleFoam;
+
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         {{ end_time }};
+deltaT          1;
+writeControl    timeStep;
+writeInterval   {{ write_interval }};
+purgeWrite      0;
+writeFormat     ascii;
+writePrecision  8;
+writeCompression off;
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable no;
+
+functions
+{
+    inletP
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        regionType      patch;
+        name            inlet;
+        operation       areaWeightedAverage;
+        fields          (p);
+    }
+
+{% for name in outlet_names %}
+    {{ name }}P
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        regionType      patch;
+        name            {{ name }};
+        operation       areaWeightedAverage;
+        fields          (p);
+    }
+
+    {{ name }}Flow
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        regionType      patch;
+        name            {{ name }};
+        operation       sum;
+        fields          (phi);
+    }
+{% endfor %}
+}
+

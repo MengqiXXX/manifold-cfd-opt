@@ -1,0 +1,27 @@
+/*  U — 速度场（rhoPimpleFoam，3D 涡流管）
+    入口速度：切向 U_theta（+y 方向近似）+ 轴向 U_axial（+z）
+    说明：
+      真实涡流管入口为切线方向喷嘴。在圆柱形 O-grid 网格中，
+      将入口速度近似为 (0, U_theta, U_axial)——切向分量指向 +y，
+      轴向分量沿管轴 +z。这是简化处理，更精确的做法是使用
+      swirlFlowRateInletVelocity BC 或 snappyHexMesh 建几何喷嘴。
+    REF1: 入口速度应给出切线+轴向分量（可压缩强旋转）
+    REF2: 轴对称模型中 U_theta 是能量分离的驱动量
+*/
+FoamFile { format ascii; class volVectorField; object U; }
+dimensions      [ 0 1 -1 0 0 0 0 ];
+internalField   uniform ( 0 0 0 );
+boundaryField
+{
+    inlet
+    {
+        // pressureInletOutletVelocity: 速度大小由压差决定，方向由下面的 tangentialVelocity 提供切向分量
+        // 注：若版本不支持此 BC，可改为 fixedValue; value uniform (0 {{ U_theta }} {{ U_axial }});
+        type            pressureInletOutletVelocity;
+        tangentialVelocity  uniform ( 0 {{ U_theta }} 0 );
+        value           uniform ( 0 {{ U_theta }} {{ U_axial }} );
+    }
+    coldEnd  { type pressureInletOutletVelocity; value uniform (0 0 0); }
+    hotEnd   { type pressureInletOutletVelocity; value uniform (0 0 0); }
+    wall     { type noSlip; }
+}

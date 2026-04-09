@@ -1,0 +1,22 @@
+#!/bin/sh
+# Allrun — 一键运行涡流管 3D 示例 case
+# 用法：cd rhvt_3d_example && ./Allrun
+# 参考：REF1 Prajit/FOSSEE OpenFOAM 3D Vortex Tube
+cd "${0%/*}" || exit 1
+
+# 网格生成
+echo "=== blockMesh ==="
+blockMesh > log.blockMesh 2>&1 && echo "blockMesh OK" || { echo "blockMesh FAILED"; exit 1; }
+
+echo "=== checkMesh ==="
+checkMesh -noFunctionObjects > log.checkMesh 2>&1
+grep -E "Max aspect|Max skewness|Max non-ortho" log.checkMesh
+
+echo "=== decomposePar ==="
+decomposePar > log.decomposePar 2>&1 && echo "decomposePar OK"
+
+echo "=== rhoPimpleFoam (parallel, 4 cores) ==="
+mpirun -np 4 rhoPimpleFoam -parallel > log.rhoPimpleFoam 2>&1 &
+echo "求解器已在后台启动 (PID $!)"
+echo "监控进度：tail -f log.rhoPimpleFoam"
+echo "查看残差：foamMonitor -l postProcessing/residuals/0/solverInfo.dat"

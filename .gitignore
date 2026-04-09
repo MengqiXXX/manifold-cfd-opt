@@ -1,0 +1,29 @@
+# Database and results
+*.sqlite
+results.csv
+results_*.csv
+
+# Java artifacts
+*.jar
+tmp_compile/
+
+# OpenFOAM case outputs (keep templates, exclude generated cases)
+cases/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.venv_monitor/
+
+# Reports
+optimization_report*.md
+
+# Monitor local deps (dev convenience)
+monitor/.deps/
+
+# OS
+.DS_Store
+Thumbs.db

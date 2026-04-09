@@ -1,0 +1,18 @@
+FoamFile
+{
+    format      ascii;
+    class       dictionary;
+    object      decomposeParDict;
+}
+
+numberOfSubdomains  {{ n_cores }};
+
+// simple 方法沿 z 轴（轴向）分解，适用于 2D 轴对称楔形网格
+// scotch 在单层楔形网格上会 SIGSEGV（Qwen 诊断）
+method          simple;
+
+simpleCoeffs
+{
+    n           ( 1 1 {{ n_cores }} );
+    delta       0.001;
+}

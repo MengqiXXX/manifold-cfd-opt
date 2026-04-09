@@ -1,0 +1,59 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  fvSchemes — rhoPimpleFoam 瞬态可压缩强旋转流
+  策略：一阶时间 + 有界二阶对流（linearUpwind）
+  REF1 建议：优先稳定性，先用保守格式跑通再升阶
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       dictionary;
+    object      fvSchemes;
+}
+
+ddtSchemes
+{
+    default         Euler;          // 一阶隐式，稳定性最佳；稳定后可换 backward
+}
+
+gradSchemes
+{
+    default         Gauss linear;
+    grad(U)         cellLimited Gauss linear 1;   // 限制梯度，防止强旋转区振荡
+    grad(k)         cellLimited Gauss linear 1;
+    grad(omega)     cellLimited Gauss linear 1;
+}
+
+divSchemes
+{
+    default             none;
+    // 动量/能量：线性迎风（二阶有界，强旋转首选）
+    div(phi,U)          Gauss linearUpwind grad(U);
+    div(phi,e)          Gauss linearUpwind grad(e);
+    div(phi,h)          Gauss linearUpwind grad(h);
+    div(phi,K)          Gauss linearUpwind grad(K);
+    // 湍流量：纯迎风（首阶有界，避免湍流量出负）
+    div(phi,k)          Gauss upwind;
+    div(phi,omega)      Gauss upwind;
+    // 粘性项
+    div(((rho*nuEff)*dev2(T(grad(U))))) Gauss linear;
+}
+
+laplacianSchemes
+{
+    default         Gauss linear corrected;
+}
+
+interpolationSchemes
+{
+    default         linear;
+}
+
+snGradSchemes
+{
+    default         corrected;
+}
+
+wallDist
+{
+    method          meshWave;
+}

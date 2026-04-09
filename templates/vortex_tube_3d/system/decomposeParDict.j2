@@ -1,0 +1,12 @@
+FoamFile
+{
+    format      ascii;
+    class       dictionary;
+    object      decomposeParDict;
+}
+
+numberOfSubdomains  {{ n_cores }};
+
+// scotch 自动负载均衡，适用于 3D O-grid 网格
+// （2D 楔形用 simple，3D 全实体用 scotch）
+method          scotch;

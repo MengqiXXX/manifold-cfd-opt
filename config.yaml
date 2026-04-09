@@ -1,0 +1,74 @@
+# ============================================================
+#  涡流管贝叶斯优化配置 — Phase 0 (Java 评估器)
+# ============================================================
+
+# ------ 评估器 ------
+evaluator: java
+
+# VortexTube.jar 路径（绝对路径或相对于运行目录）
+# 服务器上部署时改为实际路径，例如：/home/lmq/VortexTube.jar
+jar_path: C:/Users/LMQ/vortex_opt/VortexTube.jar
+
+# java 可执行文件（如果 java 不在 PATH，填写完整路径）
+# 例如: /path/to/jdk17/bin/java  或  java
+java_bin: C:/Users/LMQ/.vscode/extensions/redhat.java-1.53.0-win32-x64/jre/21.0.10-win32-x86_64/bin/java.exe
+
+# 单次评估超时（秒）
+timeout_s: 60
+
+# ------ 优化参数 ------
+
+# Sobol 初始采样点数（建议 2^n，覆盖参数空间）
+n_initial: 16
+
+# BO 迭代轮数
+n_iterations: 10
+
+# 每轮推荐的批次大小（与并发评估数匹配）
+batch_size: 8
+
+# ------ 参数空间 ------
+# （与 optimization/bayesian.py 中的 _BOUNDS_RAW 保持一致）
+bounds:
+  D:    [0.015, 0.05]    # 主流道直径 (m) = [15mm, 50mm]，Re>=10000
+  L_D:  [5.0,   20.0]    # 长径比
+  r_c:  [0.15,  0.45]    # 冷端出口半径比（物理合理范围）
+
+# ------ 停止条件 ------
+
+# 主目标值改善阈值（低于此值视为"本轮无改善"）
+convergence_tol: 0.001
+
+# 连续多少轮无改善后停止（提前收敛）
+convergence_patience: 3
+
+# ------ 数据存储 ------
+db_path: results.sqlite
+csv_output: results.csv
+
+# ============================================================
+#  Phase 1 切换说明（改为 OpenFOAM 评估器时修改以下字段）
+# ============================================================
+# evaluator: openfoam
+# openfoam_template_dir: templates/vortex_tube_2d/
+# openfoam_cores_per_case: 16
+# openfoam_cases_dir: cases/
+
+# ============================================================
+#  LLM（OpenAI Compatible：vLLM on 192.168.110.10）
+# ============================================================
+llm_base_url: "http://192.168.110.10:8001/v1"
+llm_api_key: "dummy"
+llm_model: "qwen2.5-72b"
+
+# Qwen 巡检报告（每秒推送到监控面板）
+llm_heartbeat_enabled: true
+llm_heartbeat_interval_s: 5
+llm_heartbeat_max_tokens: 120
+
+# ============================================================
+#  本地冒烟测试（不依赖 Java/OpenFOAM）
+# ============================================================
+# evaluator: dummy
+# dummy_noise: 0.0
+# dummy_sleep_s: 0.0

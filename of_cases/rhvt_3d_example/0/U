@@ -1,0 +1,19 @@
+/*  U — 入口切向速度 100 m/s (+y) + 轴向 30 m/s (+z)
+    切向分量驱动旋转，轴向分量推动气体沿管流动。
+    REF2: U_theta 是能量分离的核心驱动量（约 Ma 0.29 @ 300K）
+*/
+FoamFile { format ascii; class volVectorField; object U; }
+dimensions      [ 0 1 -1 0 0 0 0 ];
+internalField   uniform ( 0 0 0 );
+boundaryField
+{
+    inlet
+    {
+        type                pressureInletOutletVelocity;
+        tangentialVelocity  uniform ( 0 100 0 );
+        value               uniform ( 0 100 30 );
+    }
+    coldEnd  { type pressureInletOutletVelocity; value uniform (0 0 0); }
+    hotEnd   { type pressureInletOutletVelocity; value uniform (0 0 0); }
+    wall     { type noSlip; }
+}

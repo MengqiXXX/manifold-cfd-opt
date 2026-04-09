@@ -1,0 +1,24 @@
+FoamFile { format ascii; class dictionary; object thermophysicalProperties; }
+
+thermoType
+{
+    type            hePsiThermo;
+    mixture         pureMixture;
+    transport       sutherland;
+    thermo          janaf;
+    equationOfState perfectGas;
+    specie          specie;
+    energy          sensibleEnthalpy;
+}
+
+mixture
+{
+    specie      { molWeight 28.97; }
+    thermodynamics
+    {
+        Tlow    200;  Thigh 3500;  Tcommon 1000;
+        highCpCoeffs  ( 3.57304 -4.3e-4  4.75e-7 -2.12e-10  2.03e-14 -3.47e+4  3.12 );
+        lowCpCoeffs   ( 3.09591  1.22e-3 -4.0e-7   1.33e-9  -5.47e-13 -9.83e+2  5.09 );
+    }
+    transport   { As 1.458e-6; Ts 110.4; }
+}

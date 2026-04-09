@@ -1,0 +1,43 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform ({{ U_in }} 0 0);
+
+boundaryField
+{
+    inlet
+    {
+        type            fixedValue;
+        value           uniform ({{ U_in }} 0 0);
+    }
+
+{% for name in outlet_names %}
+    {{ name }}
+    {
+        type            zeroGradient;
+    }
+{% endfor %}
+
+    walls
+    {
+        type            noSlip;
+    }
+
+    front
+    {
+        type            empty;
+    }
+
+    back
+    {
+        type            empty;
+    }
+}
+

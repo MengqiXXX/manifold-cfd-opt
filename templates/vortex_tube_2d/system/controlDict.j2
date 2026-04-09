@@ -1,0 +1,83 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  OpenFOAM controlDict — rhoSimpleFoam 稳态压缩
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+
+application     rhoSimpleFoam;   // OF13: 若报错由 Qwen 自动修正为 foamRun
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         {{ max_iter }};
+deltaT          1;
+writeControl    timeStep;
+writeInterval   {{ [max_iter // 5, 100]|max }};
+purgeWrite      2;
+writeFormat     ascii;
+writePrecision  8;
+writeCompression off;
+timeFormat      general;
+timePrecision   6;
+runTimeModifiable true;
+
+functions
+{
+    patchAvg
+    {
+        type            fieldAverage;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        fields
+        (
+            T  { mean on; prime2Mean off; base time; }
+            p  { mean on; prime2Mean off; base time; }
+            U  { mean on; prime2Mean off; base time; }
+        );
+    }
+
+    coldEndAvg
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        operation       areaWeightedAverage;
+        regionType      patch;
+        name            coldEnd;
+        fields          ( T p );
+    }
+
+    hotEndAvg
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        operation       areaWeightedAverage;
+        regionType      patch;
+        name            hotEnd;
+        fields          ( T p );
+    }
+
+    inletAvg
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        operation       areaWeightedAverage;
+        regionType      patch;
+        name            inlet;
+        fields          ( T p );
+    }
+
+    residuals
+    {
+        type            solverInfo;
+        libs            ("libutilityFunctionObjects.so");
+        writeControl    timeStep;
+        writeInterval   50;
+        fields          ( p U T k omega );
+    }
+}

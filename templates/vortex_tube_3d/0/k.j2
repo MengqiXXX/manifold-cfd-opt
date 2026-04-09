@@ -1,0 +1,14 @@
+/*  k — 湍动能
+    k_in = 1.5 * (I * U_ref)^2，I=湍流强度（推荐从 3-5% 开始，REF1）
+    k_in = {{ k_in }}  [m²/s²]
+*/
+FoamFile { format ascii; class volScalarField; object k; }
+dimensions      [ 0 2 -2 0 0 0 0 ];
+internalField   uniform {{ k_in }};
+boundaryField
+{
+    inlet    { type turbulentIntensityKineticEnergyInlet; intensity {{ turb_intensity }}; value uniform {{ k_in }}; }
+    coldEnd  { type inletOutlet; inletValue uniform {{ k_in }}; value uniform {{ k_in }}; }
+    hotEnd   { type inletOutlet; inletValue uniform {{ k_in }}; value uniform {{ k_in }}; }
+    wall     { type kqRWallFunction; value uniform {{ k_in }}; }
+}
