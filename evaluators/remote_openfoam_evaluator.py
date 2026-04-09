@@ -128,7 +128,14 @@ class RemoteOpenFOAMEvaluator(Evaluator):
     def _connect(self) -> paramiko.SSHClient:
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(self.ssh_host, port=self.ssh_port, username=self.ssh_user, timeout=15)
+        ssh.connect(
+            self.ssh_host,
+            port=self.ssh_port,
+            username=self.ssh_user,
+            timeout=15,
+            banner_timeout=30,
+            auth_timeout=30,
+        )
         return ssh
 
     def _upload_case(self, ssh: paramiko.SSHClient, local_case: Path, remote_case: str) -> None:

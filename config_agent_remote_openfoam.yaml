@@ -24,7 +24,7 @@ foam_source: /opt/openfoam13/etc/bashrc
 timeout_s: 1200
 
 # 服务器（remote evaluator 会 SSH 上去跑 OpenFOAM）
-ssh_host: 192.168.110.10
+ssh_host: 127.0.0.1
 ssh_user: liumq
 ssh_port: 22
 remote_base: ~/manifold_cases
@@ -33,4 +33,3 @@ remote_base: ~/manifold_cases
 llm_base_url: "http://127.0.0.1:8001/v1"
 llm_api_key: "dummy"
 llm_model: "qwen2.5-72b"
-
