@@ -75,7 +75,7 @@ def _query_db_summary(db_path: Path) -> dict[str, Any] | None:
             if "objective" in cols and "logit_1" in cols:
                 row_best = conn.execute(
                     """
-                    SELECT logit_1, logit_2, logit_3, objective, created_at
+                    SELECT logit_1, logit_2, logit_3, flow_cv, pressure_drop, objective, created_at
                     FROM results
                     WHERE converged=1 AND status='OK' AND objective IS NOT NULL
                     ORDER BY objective DESC
@@ -87,6 +87,8 @@ def _query_db_summary(db_path: Path) -> dict[str, Any] | None:
                         "logit_1": float(row_best["logit_1"]),
                         "logit_2": float(row_best["logit_2"]),
                         "logit_3": float(row_best["logit_3"]),
+                        "flow_cv": float(row_best["flow_cv"]) if row_best["flow_cv"] is not None else math.nan,
+                        "pressure_drop": float(row_best["pressure_drop"]) if row_best["pressure_drop"] is not None else math.nan,
                         "objective": float(row_best["objective"]) if row_best["objective"] is not None else math.nan,
                         "createdAt": row_best["created_at"],
                     }
@@ -282,6 +284,35 @@ def _query_history(db_path: Path) -> list[dict[str, Any]]:
         conn = sqlite3.connect(str(db_path))
         conn.row_factory = sqlite3.Row
         try:
+            cols = {
+                str(r["name"])
+                for r in conn.execute("PRAGMA table_info(results)").fetchall()
+                if r and "name" in r.keys()
+            }
+
+            if "objective" in cols and "logit_1" in cols:
+                rows = conn.execute(
+                    """
+                    SELECT logit_1, logit_2, logit_3, flow_cv, pressure_drop, objective
+                    FROM results
+                    WHERE converged=1 AND status='OK' AND objective IS NOT NULL
+                    ORDER BY id ASC
+                    """
+                ).fetchall()
+                return [
+                    {
+                        "objective": float(r["objective"]),
+                        "flow_cv": float(r["flow_cv"]) if r["flow_cv"] is not None else math.nan,
+                        "pressure_drop": float(r["pressure_drop"]) if r["pressure_drop"] is not None else math.nan,
+                        "params": {
+                            "logit_1": float(r["logit_1"]),
+                            "logit_2": float(r["logit_2"]),
+                            "logit_3": float(r["logit_3"]),
+                        },
+                    }
+                    for r in rows
+                ]
+
             rows = conn.execute(
                 """
                 SELECT D, L_D, r_c, COALESCE(delta_T, efficiency) AS objective
@@ -367,11 +398,16 @@ def get_live_job_snapshot(root: Path) -> dict[str, Any]:
 
     best = summary.get("best")
     best_objective = float(best["objective"]) if best and best.get("objective") is not None else None
-    best_params = (
-        {"D": best["D"], "L_D": best["L_D"], "r_c": best["r_c"]}
-        if best
-        else None
-    )
+    best_params = None
+    best_flow_cv = None
+    best_pressure_drop = None
+    if best:
+        if "logit_1" in best:
+            best_params = {"logit_1": best["logit_1"], "logit_2": best["logit_2"], "logit_3": best["logit_3"]}
+            best_flow_cv = float(best.get("flow_cv")) if best.get("flow_cv") is not None else None
+            best_pressure_drop = float(best.get("pressure_drop")) if best.get("pressure_drop") is not None else None
+        elif "D" in best:
+            best_params = {"D": best["D"], "L_D": best["L_D"], "r_c": best["r_c"]}
 
     history = _query_history(db_path)
     current_phase = _infer_current_phase(evaluated, n_initial, batch_size)
@@ -383,6 +419,8 @@ def get_live_job_snapshot(root: Path) -> dict[str, Any]:
         "iteration": iteration,
         "batch_size": batch_size,
         "best_objective": best_objective,
+        "best_flow_cv": best_flow_cv,
+        "best_pressure_drop": best_pressure_drop,
         "best_params": best_params,
         "history": history,
         "current_phase": current_phase,

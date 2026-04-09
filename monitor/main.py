@@ -31,7 +31,7 @@ def _root_dir() -> Path:
 ROOT = _root_dir()
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
-app = FastAPI(title="Vortex Monitor", version="0.1.0")
+app = FastAPI(title="Manifold Monitor", version="0.1.0")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.state.heartbeat_state = HeartbeatState(False, 1.0, 80)
 app.state.heartbeat_task = None

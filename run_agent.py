@@ -54,18 +54,27 @@ def build_llm_client(cfg: dict):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="涡流管多Agent优化 Phase 1")
+    parser = argparse.ArgumentParser(description="歧管多出口优化 Agent")
     parser.add_argument("--config",    default="config.yaml")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
     evaluator_type = cfg.get("evaluator", "remote_openfoam")
 
+    n_initial = int(cfg.get("n_initial", 0))
+    n_iterations = cfg.get("n_iterations")
+    batch_size = int(cfg.get("batch_size", 4))
+    budget = cfg.get("budget")
+    if budget is None and n_iterations is not None:
+        budget = n_initial + int(n_iterations) * batch_size
+    if budget is None:
+        budget = 0
+
     print("=" * 60)
-    print("  涡流管多Agent优化 — Phase 1 (LangGraph)")
+    print("  歧管多出口优化 — Agent (LangGraph)")
     print("=" * 60)
     print(f"  评估器  : {evaluator_type}")
-    print(f"  预算    : {cfg.get('budget', 200)} 个设计点")
+    print(f"  预算    : {budget} 个设计点（n_initial={n_initial}, batch={batch_size}, n_iter={n_iterations})")
     print(f"  数据库  : {cfg['db_path']}")
     print("=" * 60)
 

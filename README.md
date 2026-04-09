@@ -22,7 +22,7 @@ python run_optimizer.py --config config_remote_openfoam.yaml
 
 ```bash
 cd manifold-cfd-opt
-MONITOR_HOST=127.0.0.1 MONITOR_PORT=8090 python monitor/run_server.py
+VORTEX_ROOT=. VORTEX_CONFIG=config_agent_remote_openfoam_local.yaml MONITOR_HOST=127.0.0.1 MONITOR_PORT=8090 python monitor/run_server.py
 ```
 
 ## 参数化空间（当前模板）

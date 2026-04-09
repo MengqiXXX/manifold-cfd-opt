@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import os
 import re
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
@@ -51,6 +52,8 @@ _cache: CFDStatus | None = None
 _cache_time: float = 0.0
 _lock = asyncio.Lock()
 
+_CASES_BASE = os.getenv("VORTEX_REMOTE_CASES_BASE", "~/manifold_cases")
+
 _DISCOVER_SCRIPT = r"""
 SOLVER_RE='rhoSimpleFoam|foamRun|simpleFoam|rhoPimpleFoam|buoyantSimpleFoam|buoyantPimpleFoam|pisoFoam|pimpleFoam'
 echo '===CWDS==='
@@ -59,11 +62,11 @@ for pid in $(ps aux | grep -E "$SOLVER_RE" | grep -v grep | awk '{print $2}'); d
 done | sort -u
 
 echo '===RECENT_LOGS==='
-find ~/vortex_opt/of_cases -maxdepth 2 -name 'log.*Foam' -mmin -30 2>/dev/null \
+find {{CASES_BASE}} -maxdepth 3 -name 'log.*' -mmin -30 2>/dev/null \
     | sed 's|/log\.[^/]*$||' | sort -u
 
 echo '===HAS_PROC0==='
-for d in ~/vortex_opt/of_cases/*/; do
+for d in {{CASES_BASE}}/*/; do
     d="${d%/}"
     [ -d "$d/processor0" ] && echo "$d"
 done 2>/dev/null
@@ -201,9 +204,9 @@ def _collect() -> CFDStatus:
     now = dt.datetime.utcnow()
     ts      = now.replace(microsecond=0).isoformat() + "Z"
     next_ts = (now + dt.timedelta(seconds=REFRESH_INTERVAL)).replace(microsecond=0).isoformat() + "Z"
-    base    = CFDStatus(ts=ts, next_refresh_ts=next_ts, cases_base="~/vortex_opt/of_cases")
+    base    = CFDStatus(ts=ts, next_refresh_ts=next_ts, cases_base=_CASES_BASE)
 
-    discover_out = ssh_exec(_DISCOVER_SCRIPT, timeout=20)
+    discover_out = ssh_exec(_DISCOVER_SCRIPT.replace("{{CASES_BASE}}", _CASES_BASE), timeout=20)
     if not discover_out:
         base.error = "SSH 连接失败"
         return base
