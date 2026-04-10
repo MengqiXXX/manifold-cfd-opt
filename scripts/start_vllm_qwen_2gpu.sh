@@ -16,4 +16,6 @@ python3 -m vllm.entrypoints.openai.api_server \
   --served-model-name "${VLLM_SERVED_MODEL_NAME}" \
   --tensor-parallel-size "${VLLM_TP}" \
   --max-model-len "${VLLM_MAX_LEN}" \
-  --quantization awq
+  --quantization awq_marlin \
+  --disable-custom-all-reduce \
+  --gpu-memory-utilization 0.88
