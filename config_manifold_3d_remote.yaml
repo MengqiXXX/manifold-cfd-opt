@@ -1,0 +1,35 @@
+evaluator: remote_openfoam
+
+# 预算（Agent 会用 total_budget = n_initial + n_iterations*batch_size）
+n_initial: 8
+n_iterations: 20
+batch_size: 4
+
+# 存储
+db_path: results_agent_3d_remote.sqlite
+csv_output: results_agent_3d_remote.csv
+report_path: optimization_report_3d_remote.md
+
+# Agent 异常检测（可选）
+anomaly_diverge_streak: 3
+anomaly_jump_sigma: 3.0
+convergence_tol: 0.0005
+convergence_patience: 4
+
+# OpenFOAM 模板（3D）
+openfoam_template_dir: templates/manifold_3d
+openfoam_cases_dir: ./.tmp_cases_3d
+openfoam_cores_per_case: 8
+foam_source: /opt/openfoam13/etc/bashrc
+timeout_s: 1800
+
+# 服务器（remote evaluator 会 SSH 上去跑 OpenFOAM）
+ssh_host: 127.0.0.1
+ssh_user: liumq
+ssh_port: 22
+remote_base: /home/liumq/manifold_cases_3d
+
+# Qwen（服务器本机 vLLM OpenAI compatible）
+llm_base_url: "http://127.0.0.1:8001/v1"
+llm_api_key: "dummy"
+llm_model: "qwen2.5-72b"

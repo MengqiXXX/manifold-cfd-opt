@@ -109,6 +109,10 @@ def _latest_value_from_surface_field_value(ssh: paramiko.SSHClient, case_dir: st
     code, out, _ = _ssh_exec(ssh, cmd, timeout=timeout)
     if code != 0:
         return None
+    try:
+        return float(out.strip().splitlines()[-1])
+    except Exception:
+        return None
 
 
 def _latest_value_from_surface_field_value_local(case_dir: str, func_name: str) -> float | None:
@@ -128,10 +132,15 @@ def _latest_value_from_surface_field_value_local(case_dir: str, func_name: str) 
         return float(last[-1])
     except Exception:
         return None
-    try:
-        return float(out.strip().splitlines()[-1])
-    except Exception:
-        return None
+
+
+def _derive_mesh_params_3d(params: DesignParams, outlet_count: int = 4) -> dict:
+    """3D variant: real depth thickness=0.1m, n_cells_z=10, symmetryPlane front/back."""
+    d = _derive_mesh_params(params, outlet_count)
+    d["thickness"] = 0.1
+    d["n_cells_z"] = 10
+    d["W"] = 0.1
+    return d
 
 
 @dataclass
@@ -196,7 +205,6 @@ class RemoteOpenFOAMEvaluator(Evaluator):
                 pass
 
     def _run_case(self, ssh: paramiko.SSHClient, remote_case_dir: str, timeout: int) -> tuple[bool, str]:
-        solver_cmd = "simpleFoam"
         cmd = (
             f"bash -lc 'set -euo pipefail; "
             f"source {self.foam_source}; "
@@ -204,7 +212,7 @@ class RemoteOpenFOAMEvaluator(Evaluator):
             "blockMesh > log.blockMesh 2>&1; "
             "checkMesh > log.checkMesh 2>&1; "
             "decomposePar -force > log.decomposePar 2>&1; "
-            f"mpirun -np {int(self.n_cores)} {solver_cmd} -parallel > log.solver 2>&1; "
+            f"mpirun -np {int(self.n_cores)} foamRun -parallel > log.solver 2>&1; "
             "reconstructPar -latestTime > log.reconstructPar 2>&1; "
             "echo DONE'"
         )
@@ -214,7 +222,6 @@ class RemoteOpenFOAMEvaluator(Evaluator):
     def _run_case_local(self, remote_case_dir: str, timeout: int) -> tuple[bool, str]:
         import subprocess
 
-        solver_cmd = "simpleFoam"
         cmd = (
             f"bash -lc 'set -euo pipefail; "
             f"source {self.foam_source}; "
@@ -222,7 +229,7 @@ class RemoteOpenFOAMEvaluator(Evaluator):
             "blockMesh > log.blockMesh 2>&1; "
             "checkMesh > log.checkMesh 2>&1; "
             "decomposePar -force > log.decomposePar 2>&1; "
-            f"mpirun -np {int(self.n_cores)} {solver_cmd} -parallel > log.solver 2>&1; "
+            f"mpirun -np {int(self.n_cores)} foamRun -parallel > log.solver 2>&1; "
             "reconstructPar -latestTime > log.reconstructPar 2>&1; "
             "echo DONE'"
         )
@@ -235,7 +242,10 @@ class RemoteOpenFOAMEvaluator(Evaluator):
 
     def evaluate_one(self, params: DesignParams) -> EvalResult:
         t0 = time.perf_counter()
-        ctx = _derive_mesh_params(params=params, outlet_count=4)
+        if "3d" in str(self.template_dir).lower():
+            ctx = _derive_mesh_params_3d(params=params, outlet_count=4)
+        else:
+            ctx = _derive_mesh_params(params=params, outlet_count=4)
         ctx["n_cores"] = int(self.n_cores)
 
         with tempfile.TemporaryDirectory() as tmp:
