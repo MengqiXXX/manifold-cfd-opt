@@ -206,7 +206,7 @@ class RemoteOpenFOAMEvaluator(Evaluator):
 
     def _run_case(self, ssh: paramiko.SSHClient, remote_case_dir: str, timeout: int) -> tuple[bool, str]:
         cmd = (
-            f"bash -lc 'set -euo pipefail; "
+            f"bash -lc 'set -eo pipefail; "
             f"source {self.foam_source}; "
             f"cd {remote_case_dir}; "
             "blockMesh > log.blockMesh 2>&1; "
@@ -223,7 +223,7 @@ class RemoteOpenFOAMEvaluator(Evaluator):
         import subprocess
 
         cmd = (
-            f"bash -lc 'set -euo pipefail; "
+            f"bash -lc 'set -eo pipefail; "
             f"source {self.foam_source}; "
             f"cd {remote_case_dir}; "
             "blockMesh > log.blockMesh 2>&1; "
