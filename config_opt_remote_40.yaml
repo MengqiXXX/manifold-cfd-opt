@@ -1,0 +1,32 @@
+evaluator: remote_openfoam
+
+# 至少 40 个案例：8 + 8*4 = 40
+n_initial: 8
+n_iterations: 8
+batch_size: 4
+
+# 参数空间
+bounds:
+  logit_1: [-2.0, 2.0]
+  logit_2: [-2.0, 2.0]
+  logit_3: [-2.0, 2.0]
+
+# 目录
+template_dir: templates/manifold_2d
+cases_base: of_cases
+
+# 服务器 & OpenFOAM
+ssh_host: 192.168.110.10
+ssh_user: liumq
+ssh_port: 22
+remote_base: ~/manifold_cases
+foam_source: /opt/openfoam13/etc/bashrc
+n_cores: 4
+max_parallel_cases: 4
+timeout_s: 1200
+
+# 存储（独立一份，避免混入上次结果）
+db_path: results_opt_40.sqlite
+csv_output: results_opt_40.csv
+report_path: optimization_report_opt_40.md
+

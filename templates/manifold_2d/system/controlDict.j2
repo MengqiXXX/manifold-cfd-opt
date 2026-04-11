@@ -31,9 +31,8 @@ functions
         libs            ("libfieldFunctionObjects.so");
         writeControl    writeTime;
         writeFields     false;
-        regionType      patch;
-        name            inlet;
-        operation       areaWeightedAverage;
+        patch           inlet;
+        operation       areaAverage;
         fields          (p);
     }
 
@@ -44,9 +43,8 @@ functions
         libs            ("libfieldFunctionObjects.so");
         writeControl    writeTime;
         writeFields     false;
-        regionType      patch;
-        name            {{ name }};
-        operation       areaWeightedAverage;
+        patch           {{ name }};
+        operation       areaAverage;
         fields          (p);
     }
 
@@ -56,8 +54,7 @@ functions
         libs            ("libfieldFunctionObjects.so");
         writeControl    writeTime;
         writeFields     false;
-        regionType      patch;
-        name            {{ name }};
+        patch           {{ name }};
         operation       sum;
         fields          (phi);
     }

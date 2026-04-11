@@ -1,0 +1,25 @@
+[Unit]
+Description=OpenFOAM Monitor (FastAPI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=liumq
+WorkingDirectory=/home/liumq/manifold-cfd-opt
+
+Environment=MONITOR_HOST=127.0.0.1
+Environment=MONITOR_PORT=8090
+Environment=VORTEX_SSH_HOST=127.0.0.1
+Environment=VORTEX_SSH_USER=liumq
+Environment=VORTEX_SSH_PORT=22
+Environment=VORTEX_REMOTE_CASES_BASE=/home/liumq/manifold_cases
+Environment=VORTEX_SSH_KEY=/home/liumq/.ssh/id_ed25519
+
+ExecStart=/usr/bin/python3 -u monitor/run_server.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+

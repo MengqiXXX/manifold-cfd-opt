@@ -9,6 +9,10 @@ tmp_compile/
 
 # OpenFOAM case outputs (keep templates, exclude generated cases)
 cases/
+of_cases/
+.tmp_cases*/
+.tmp_model*/
+log.*
 
 # Python
 __pycache__/

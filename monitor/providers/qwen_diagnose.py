@@ -34,6 +34,7 @@ from .ssh_pool import ssh_exec, is_connected
 _LLM_BASE_URL = os.getenv("VORTEX_LLM_BASE_URL", "http://192.168.110.10:8001/v1")
 _LLM_MODEL    = os.getenv("VORTEX_LLM_MODEL",    "qwen2.5-72b")
 _LLM_API_KEY  = os.getenv("VORTEX_LLM_API_KEY",  "dummy")
+_CASES_BASE   = os.getenv("VORTEX_REMOTE_CASES_BASE", "~/manifold_cases")
 
 
 # ── 状态结构 ─────────────────────────────────────────────────────────────────
@@ -44,6 +45,7 @@ class DiagReport:
     ok: bool = False
     of_running: bool = False
     foam_procs: list[str] = field(default_factory=list)
+    foam_cwds: list[str] = field(default_factory=list)
     case_dirs: list[str] = field(default_factory=list)
     log_tail: str = ""
     error_snippet: str = ""
@@ -117,13 +119,10 @@ bash -lc 'source /opt/openfoam13/etc/bashrc 2>/dev/null && foamVersion 2>/dev/nu
   echo 'unknown'
 
 echo '===CASE_DIRS==='
-ls -d ~/vortex_opt/of_cases/*/ 2>/dev/null | head -20 || echo '(无 case 目录)'
-
-echo '===TEST3D_STRUCT==='
-ls ~/vortex_opt/of_cases/test_3d/ 2>/dev/null || echo '(not found)'
+find {{CASES_BASE}} -maxdepth 3 -type d -name system -printf '%h\n' 2>/dev/null | head -20 || echo '(无 case 目录)'
 
 echo '===LATEST_LOG==='
-latest=$(find ~/vortex_opt/of_cases -name 'log.*Foam' -printf '%T@ %p\n' 2>/dev/null \
+latest=$(find {{CASES_BASE}} -maxdepth 5 -name 'log.*' -printf '%T@ %p\n' 2>/dev/null \
   | sort -rn | head -1 | awk '{print $2}')
 if [ -n "$latest" ]; then
   echo "LOG_FILE:$latest"
@@ -133,12 +132,12 @@ else
 fi
 
 echo '===BLOCKMESH_LOG==='
-latest_bm=$(find ~/vortex_opt/of_cases -name 'log.blockMesh' -printf '%T@ %p\n' 2>/dev/null \
+latest_bm=$(find {{CASES_BASE}} -maxdepth 5 -name 'log.blockMesh' -printf '%T@ %p\n' 2>/dev/null \
   | sort -rn | head -1 | awk '{print $2}')
 [ -n "$latest_bm" ] && tail -30 "$latest_bm" || echo '(无 blockMesh 日志)'
 
 echo '===DECOMPOSE_LOG==='
-latest_dc=$(find ~/vortex_opt/of_cases -name 'log.decomposePar' -printf '%T@ %p\n' 2>/dev/null \
+latest_dc=$(find {{CASES_BASE}} -maxdepth 5 -name 'log.decomposePar' -printf '%T@ %p\n' 2>/dev/null \
   | sort -rn | head -1 | awk '{print $2}')
 [ -n "$latest_dc" ] && tail -20 "$latest_dc" || echo '(无 decomposePar 日志)'
 
@@ -146,7 +145,7 @@ echo '===GPU_LOAD==='
 nvidia-smi --query-gpu=index,utilization.gpu,temperature.gpu --format=csv,noheader,nounits 2>/dev/null || true
 
 echo '===DISK==='
-df -h ~/vortex_opt/ 2>/dev/null | tail -1
+df -h {{CASES_BASE}} 2>/dev/null | tail -1
 """
 
 
@@ -478,7 +477,7 @@ def _diagnose(auto_launch: bool = True) -> DiagReport:
     report = DiagReport(ts=ts)
 
     # ── 采集状态：使用共享连接 ────────────────────────────────────────────
-    raw = _exec_shared(_DIAG_SCRIPT, timeout=30)
+    raw = _exec_shared(_DIAG_SCRIPT.replace("{{CASES_BASE}}", _CASES_BASE), timeout=30)
     if not raw.strip():
         report.ssh_error = f"SSH 连接失败 ({_SSH_HOST})"
         report.qwen_analysis = "无法连接服务器，SSH 连接失败。请检查网络和 SSH 密钥配置。"
@@ -495,10 +494,10 @@ def _diagnose(auto_launch: bool = True) -> DiagReport:
         dc_log     = _parse_section(raw, "DECOMPOSE_LOG")
         gpu_load   = _parse_section(raw, "GPU_LOAD")
         disk_info  = _parse_section(raw, "DISK")
-        test3d     = _parse_section(raw, "TEST3D_STRUCT")
 
         foam_procs = [l.strip() for l in procs_raw.splitlines() if l.strip() and "无 OF 进程" not in l]
-        of_running = len(foam_procs) > 0
+        foam_cwds = [l.strip().rstrip("/") for l in cwds_raw.splitlines() if l.strip()]
+        of_running = (len(foam_procs) > 0) or (len(foam_cwds) > 0)
 
         # 提取日志中的错误片段
         error_keywords = ["FOAM FATAL", "Fatal error", "Floating point", "segfault", "Error", "failed", "SIGSEGV"]
@@ -507,6 +506,7 @@ def _diagnose(auto_launch: bool = True) -> DiagReport:
 
         report.of_running    = of_running
         report.foam_procs    = foam_procs
+        report.foam_cwds     = foam_cwds
         report.case_dirs     = case_dirs
         report.log_tail      = log_tail[:3000]
         report.error_snippet = error_snippet
@@ -523,9 +523,6 @@ def _diagnose(auto_launch: bool = True) -> DiagReport:
 
 === 案例目录 ===
 {chr(10).join(case_dirs) if case_dirs else '无案例目录'}
-
-=== test_3d 目录结构 ===
-{test3d}
 
 === 最新求解器日志（末尾）===
 {log_tail[-1500:] if log_tail else '无日志'}
@@ -551,12 +548,7 @@ def _diagnose(auto_launch: bool = True) -> DiagReport:
 
         # ── 自动启动 OF（若未运行且有可用案例）─────────────────────────────
         if auto_launch and not of_running:
-            home_raw = _exec_shared("echo $HOME").strip()
-            test3d_path = f"{home_raw}/vortex_opt/of_cases/test_3d"
-            check = _exec_shared(f"[ -d '{test3d_path}/system' ] && echo yes || echo no")
-            if check.strip() == "yes":
-                launch_dir = test3d_path
-            elif case_dirs:
+            if case_dirs:
                 launch_dir = case_dirs[0]
             else:
                 launch_dir = None

@@ -77,7 +77,7 @@ def _query_db_summary(db_path: Path) -> dict[str, Any] | None:
                     """
                     SELECT logit_1, logit_2, logit_3, flow_cv, pressure_drop, objective, created_at
                     FROM results
-                    WHERE converged=1 AND status='OK' AND objective IS NOT NULL
+                    WHERE converged=1 AND status='OK' AND objective IS NOT NULL AND objective = objective
                     ORDER BY objective DESC
                     LIMIT 1
                     """

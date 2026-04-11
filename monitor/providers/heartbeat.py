@@ -9,6 +9,7 @@ from typing import Any
 
 import yaml
 
+from .cfd_status import get_cfd_status
 from .jobs import get_live_job_snapshot
 from .metrics import get_metric_sample
 
@@ -74,6 +75,16 @@ def _brief_job(job: dict[str, Any] | None) -> str:
         parts.append(f"phase={phase}")
     return " ".join(parts)
 
+def _brief_cfd(cfd: dict[str, Any] | None) -> str:
+    if not cfd:
+        return "CFD:未知"
+    n = cfd.get("n_running")
+    try:
+        n_i = int(n) if n is not None else 0
+    except Exception:
+        n_i = 0
+    return f"CFD:运行中{n_i}个case" if n_i > 0 else "CFD:无运行中case"
+
 
 @dataclass
 class HeartbeatState:
@@ -131,11 +142,12 @@ async def heartbeat_loop(root: Path, state: HeartbeatState, client: Any, model: 
         try:
             metrics = await get_metric_sample()
             job = get_live_job_snapshot(root)
+            cfd = (await get_cfd_status()).to_dict()
             prompt = (
                 "你是仿真优化巡检机器人。每秒输出一条中文巡检摘要(<=80字)，"
                 "包含：是否在跑仿真、GPU是否有推理负载、当前阶段/进度。"
                 "若发现异常(发散/超时/无有效点)给出一句下一步排查建议。"
-                f"\n{_brief_metrics(metrics)}\n{_brief_job(job)}"
+                f"\n{_brief_metrics(metrics)}\n{_brief_job(job)}\n{_brief_cfd(cfd)}"
             )
 
             def _call() -> str:

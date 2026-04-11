@@ -41,6 +41,11 @@ class CFDStatus:
     cases_base: str = ""
     cases: list[CaseGeom] = field(default_factory=list)
     n_running: int = 0
+    n_active: int = 0
+    selection_source: str = "none"
+    n_proc_dirs: int = 0
+    n_recent_dirs: int = 0
+    n_proc0_dirs: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -94,9 +99,9 @@ def _section(raw: str, tag: str) -> list[str]:
 
 
 def _pick_running_dirs(raw: str) -> list[str]:
-    cwds   = _section(raw, "CWDS")
+    cwds = _section(raw, "CWDS")
     recent = _section(raw, "RECENT_LOGS")
-    proc0  = _section(raw, "HAS_PROC0")
+    proc0 = _section(raw, "HAS_PROC0")
     candidates = cwds or recent or proc0
     seen: set[str] = set()
     result: list[str] = []
@@ -105,6 +110,16 @@ def _pick_running_dirs(raw: str) -> list[str]:
             seen.add(d)
             result.append(d)
     return result
+
+
+def _uniq(lines: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for s in lines:
+        if s and s not in seen:
+            seen.add(s)
+            out.append(s)
+    return out
 
 
 def _case_info_script(dirs: list[str]) -> str:
@@ -211,14 +226,36 @@ def _collect() -> CFDStatus:
         base.error = "SSH 连接失败"
         return base
 
-    running_dirs = _pick_running_dirs(discover_out)
-    base.n_running = len(running_dirs)
+    cwds = _uniq(_section(discover_out, "CWDS"))
+    recent = _uniq(_section(discover_out, "RECENT_LOGS"))
+    proc0 = _uniq(_section(discover_out, "HAS_PROC0"))
 
-    if not running_dirs:
+    base.n_proc_dirs = len(cwds)
+    base.n_recent_dirs = len(recent)
+    base.n_proc0_dirs = len(proc0)
+
+    base.n_running = len(cwds)
+
+    if cwds:
+        base.selection_source = "process"
+        active_dirs = cwds
+    elif recent:
+        base.selection_source = "recent_logs"
+        active_dirs = recent
+    elif proc0:
+        base.selection_source = "processor0"
+        active_dirs = proc0
+    else:
+        base.selection_source = "none"
+        active_dirs = []
+
+    base.n_active = len(active_dirs)
+
+    if not active_dirs:
         base.ok = True
         return base
 
-    info_script = _case_info_script(running_dirs)
+    info_script = _case_info_script(active_dirs)
     info_out    = ssh_exec(info_script, timeout=30)
 
     case_blocks = re.split(r"===CASE_BEGIN===", info_out)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import secrets
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +32,24 @@ def _root_dir() -> Path:
 ROOT = _root_dir()
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
+
+def _admin_token() -> str | None:
+    v = os.getenv("MONITOR_ADMIN_TOKEN")
+    return v.strip() if v and v.strip() else None
+
+
+def _check_admin(req_token: str | None) -> bool:
+    token = _admin_token()
+    if not token:
+        return False
+    if not req_token:
+        return False
+    return secrets.compare_digest(req_token.strip(), token)
+
+
+def _readonly() -> bool:
+    return os.getenv("MONITOR_READONLY", "0").strip() in {"1", "true", "True"}
+
 app = FastAPI(title="Manifold Monitor", version="0.1.0")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.state.heartbeat_state = HeartbeatState(False, 1.0, 80)
@@ -45,6 +64,11 @@ def index() -> FileResponse:
 @app.get("/api/health")
 def health() -> JSONResponse:
     return JSONResponse({"ok": True, "root": str(ROOT)})
+
+
+@app.get("/api/config")
+def config() -> JSONResponse:
+    return JSONResponse({"readonly": _readonly()})
 
 
 @app.get("/api/jobs")
@@ -122,6 +146,8 @@ async def cfd_status_api() -> JSONResponse:
 
 @app.post("/api/cfd-status/refresh")
 async def cfd_status_refresh() -> JSONResponse:
+    if _readonly():
+        return JSONResponse({"error": "not_found"}, status_code=404)
     status = await get_cfd_status(force=True)
     return JSONResponse(status.to_dict())
 
@@ -136,6 +162,8 @@ def qwen_diagnose_get() -> JSONResponse:
 
 @app.post("/api/qwen-diagnose")
 async def qwen_diagnose_post(auto_launch: bool = True) -> JSONResponse:
+    if _readonly():
+        return JSONResponse({"error": "not_found"}, status_code=404)
     report = await run_diagnosis(auto_launch=auto_launch)
     return JSONResponse(report.to_dict())
 
@@ -143,6 +171,9 @@ async def qwen_diagnose_post(auto_launch: bool = True) -> JSONResponse:
 @app.post("/api/admin/ssh-exec")
 async def admin_ssh_exec(body: dict) -> JSONResponse:
     """管理员接口：通过共享 SSH 连接在服务器上执行命令。仅供内部管理使用。"""
+    token = body.get("token")
+    if not _check_admin(token):
+        return JSONResponse({"error": "not_found"}, status_code=404)
     from .providers.ssh_pool import ssh_exec
     cmd = body.get("cmd", "")
     timeout = int(body.get("timeout", 20))

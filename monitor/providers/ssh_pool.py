@@ -1,98 +1,54 @@
 """
-Shared single persistent SSH connection for all monitor providers.
-
-All providers import `ssh_exec()` from here — only ONE TCP connection
-to the server is ever open, eliminating sshd MaxStartups errors.
-Thread-safe via threading.Lock (paramiko channels are multiplexed over
-the single transport, so concurrent exec_command calls are fine).
+Shared SSH exec for all monitor providers.
 """
 from __future__ import annotations
 
 import os
 import threading
-from pathlib import Path
 from typing import Optional
 
-try:
-    import paramiko
-    _OK = True
-except ImportError:
-    _OK = False
+from infra.ssh import SSHConfig, ssh_exec as _ssh_exec
 
 _SSH_HOST = os.getenv("VORTEX_SSH_HOST", "192.168.110.10")
-_SSH_PORT  = int(os.getenv("VORTEX_SSH_PORT", "22"))
-_SSH_USER  = os.getenv("VORTEX_SSH_USER", "liumq")
-_SSH_KEY   = os.getenv("VORTEX_SSH_KEY",  "C:/Users/LMQ/.ssh/id_ed25519")
+_SSH_PORT = int(os.getenv("VORTEX_SSH_PORT", "22"))
+_SSH_USER = os.getenv("VORTEX_SSH_USER", "liumq")
+_SSH_KEY = os.getenv("VORTEX_SSH_KEY", "C:/Users/LMQ/.ssh/id_ed25519")
+_STRICT = os.getenv("VORTEX_SSH_STRICT_HOSTKEY", "0").strip() in {"1", "true", "True"}
 
-_client: Optional["paramiko.SSHClient"] = None
+_last_error: Optional[str] = None
 _lock = threading.Lock()
 
 
-def _connect() -> "paramiko.SSHClient":
-    c = paramiko.SSHClient()
-    c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    c.connect(
-        hostname=_SSH_HOST, port=_SSH_PORT, username=_SSH_USER,
-        key_filename=_SSH_KEY if Path(_SSH_KEY).exists() else None,
-        timeout=12, banner_timeout=20,
-        # Keep-alive to prevent idle disconnect
-        disabled_algorithms={"pubkeys": []},
+def _cfg() -> SSHConfig:
+    return SSHConfig(
+        host=_SSH_HOST,
+        user=_SSH_USER,
+        port=_SSH_PORT,
+        key_path=_SSH_KEY,
+        strict_host_key=_STRICT,
     )
-    t = c.get_transport()
-    if t:
-        t.set_keepalive(30)
-    return c
-
-
-def _get() -> "paramiko.SSHClient | None":
-    global _client
-    if not _OK:
-        return None
-    try:
-        if _client is not None:
-            t = _client.get_transport()
-            if t and t.is_active():
-                return _client
-    except Exception:
-        pass
-    try:
-        _client = _connect()
-        return _client
-    except Exception:
-        _client = None
-        return None
 
 
 def ssh_exec(cmd: str, timeout: int = 15) -> str:
-    """Run cmd on the remote server; return stdout+stderr or '' on error.
-    Thread-safe: uses a single shared connection with per-call channels.
-    """
+    global _last_error
     with _lock:
-        ssh = _get()
-        if ssh is None:
-            return ""
         try:
-            _, o, e = ssh.exec_command(cmd, timeout=timeout)
-            out = o.read().decode("utf-8", errors="replace")
-            err = e.read().decode("utf-8", errors="replace")
+            code, out, err = _ssh_exec(_cfg(), cmd, timeout=int(timeout))
+            _last_error = None
             return (out + err)
-        except Exception:
-            # Mark connection as dead
-            global _client
-            try:
-                _client.close()
-            except Exception:
-                pass
-            _client = None
+        except Exception as e:
+            _last_error = f"{type(e).__name__}: {e}"
             return ""
 
 
 def is_connected() -> bool:
     with _lock:
         try:
-            if _client is None:
-                return False
-            t = _client.get_transport()
-            return bool(t and t.is_active())
+            code, out, _ = _ssh_exec(_cfg(), "echo ok", timeout=8)
+            return code == 0 and "ok" in (out or "")
         except Exception:
             return False
+
+
+def last_error() -> str | None:
+    return _last_error

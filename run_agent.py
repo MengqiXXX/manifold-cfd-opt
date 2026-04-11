@@ -88,6 +88,7 @@ def main():
         template_dir=cfg.get("openfoam_template_dir", "templates/manifold_2d"),
         cases_base=cfg.get("openfoam_cases_dir", "cases"),
         n_cores=cfg.get("openfoam_cores_per_case", 8),
+        max_parallel_cases=int(cfg.get("openfoam_max_parallel_cases", 1)),
         timeout=cfg.get("timeout_s", 1200),
         foam_source=cfg.get("foam_source", "/opt/openfoam13/etc/bashrc"),
         ssh_host=cfg.get("ssh_host", "192.168.110.10"),

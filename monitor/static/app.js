@@ -9,6 +9,7 @@ const S = {
   cfdStatus: null,
   diagReport: null,
   diagLoading: false,
+  config: { readonly: false },
 }
 
 const fmtPct = v => isFinite(+v) ? `${Math.round(+v)}%` : '-'
@@ -150,6 +151,7 @@ function buildLayout(){
 }
 
 function triggerDiagnosis(autoLaunch){
+  if(S.config&&S.config.readonly)return
   if(S.diagLoading)return
   S.diagLoading=true
   renderDiagReport()
@@ -177,13 +179,14 @@ function renderDiagReport(){
   if(!wrap)return
   const rpt=S.diagReport
   const loading=S.diagLoading
+  const readonly=!!(S.config&&S.config.readonly)
 
   const card=el('div',{class:'diag-card'})
 
   // Header
   const head=el('div',{class:'diag-head'})
   const statusBadge=el('span',{class:'diag-badge'+(loading?' loading':rpt?(rpt.of_running?' of-running':' of-stopped'):'')},
-    loading?'⏳ 分析中…':rpt?(rpt.of_running?'▶ OF 运行中':'⚠ OF 未运行'):'待诊断')
+    loading?'⏳ 分析中…':rpt?(rpt.of_running?'▶ 检测到求解进程':'⏸ 未检测到求解进程'):'待诊断')
   head.appendChild(el('div',{class:'diag-title'},
     el('span',{},'🤖'),
     el('span',{},'Qwen 诊断报告'),
@@ -270,14 +273,18 @@ function renderDiagReport(){
 
   // Footer buttons
   const footer=el('div',{class:'diag-footer'})
-  footer.appendChild(el('button',{
-    class:'diag-btn primary'+(loading?' disabled':''),
-    onclick:function(){if(!S.diagLoading)triggerDiagnosis(true)}
-  },'🚀 诊断并自动启动 OF'))
-  footer.appendChild(el('button',{
-    class:'diag-btn'+(loading?' disabled':''),
-    onclick:function(){if(!S.diagLoading)triggerDiagnosis(false)}
-  },'🔍 仅诊断'))
+  if(readonly){
+    footer.appendChild(el('div',{class:'diag-hint'},'只读模式：已禁用诊断/启动操作'))
+  }else{
+    footer.appendChild(el('button',{
+      class:'diag-btn primary'+(loading?' disabled':''),
+      onclick:function(){if(!S.diagLoading)triggerDiagnosis(true)}
+    },'🚀 诊断并自动启动 OF'))
+    footer.appendChild(el('button',{
+      class:'diag-btn'+(loading?' disabled':''),
+      onclick:function(){if(!S.diagLoading)triggerDiagnosis(false)}
+    },'🔍 仅诊断'))
+  }
   card.appendChild(footer)
 
   wrap.innerHTML=''
@@ -299,6 +306,7 @@ function renderCFDStatus(){
   const wrap=document.getElementById('cfd-wrap')
   if(!wrap)return
   const st=S.cfdStatus
+  const readonly=!!(S.config&&S.config.readonly)
   if(!st){
     wrap.innerHTML='<div style="color:var(--muted2);padding:16px 0">加载中…</div>'
     return
@@ -307,7 +315,9 @@ function renderCFDStatus(){
 
   // ── Header ──
   const head=el('div',{class:'cfd-head'})
-  const badgeTxt=st.n_running>0?`${st.n_running} 个运行中`:'无运行工况'
+  const badgeTxt=st.n_running>0
+    ?`▶ ${st.n_running} 个运行中`
+    :(st.n_active>0?`⏸ 无进程（活跃 ${st.n_active}）`:'空闲')
   head.appendChild(el('div',{class:'cfd-title'},
     el('span',{},'🌀'),
     el('span',{},'仿真工况'),
@@ -325,7 +335,7 @@ function renderCFDStatus(){
   }
 
   // ── Shared info ──
-  if(st.n_running>0||(st.ok&&st.solver&&st.solver!=='unknown')){
+  if(st.n_running>0||st.n_active>0||(st.ok&&st.solver&&st.solver!=='unknown')){
     card.appendChild(el('div',{class:'cfd-info-grid'},
       el('div',{class:'cfd-info-item'},
         el('div',{class:'cfd-info-label'},'求解器'),
@@ -342,6 +352,14 @@ function renderCFDStatus(){
       el('div',{class:'cfd-info-item'},
         el('div',{class:'cfd-info-label'},'版本'),
         el('div',{class:'cfd-info-val'},st.of_version||'—'),
+      ),
+      el('div',{class:'cfd-info-item'},
+        el('div',{class:'cfd-info-label'},'判定来源'),
+        el('div',{class:'cfd-info-val'},st.selection_source||'—'),
+      ),
+      el('div',{class:'cfd-info-item'},
+        el('div',{class:'cfd-info-label'},'目录统计'),
+        el('div',{class:'cfd-info-val'},`${st.n_proc_dirs??0}/${st.n_recent_dirs??0}/${st.n_proc0_dirs??0}`),
       ),
     ))
   }
@@ -360,18 +378,19 @@ function renderCFDStatus(){
     }
     table.appendChild(tbody)
     card.appendChild(table)
-  }else if(st.ok&&st.n_running===0){
-    card.appendChild(el('div',{class:'cfd-empty'},'当前没有运行中的 OpenFOAM 工况'))
+  }else if(st.ok&&st.n_running===0&&(!st.n_active||st.n_active===0)){
+    card.appendChild(el('div',{class:'cfd-empty'},'当前未检测到运行中的 OpenFOAM 求解进程'))
   }
 
   // ── Refresh button ──
   card.appendChild(el('div',{class:'cfd-footer'},
-    el('button',{class:'cfd-refresh-btn',onclick:function(){
+    el('button',{class:'cfd-refresh-btn'+(readonly?' disabled':''),onclick:function(){
+      if(readonly)return
       fetch('/api/cfd-status/refresh',{method:'POST'})
         .then(function(r){return r.json()})
         .then(function(d){S.cfdStatus=d;renderCFDStatus()})
         .catch(function(){})
-    }},'↻ 立即刷新'),
+    }},readonly?'只读':'↻ 立即刷新'),
   ))
 
   wrap.innerHTML=''
@@ -761,6 +780,7 @@ function drawScatter(canvas,history){
 
 document.addEventListener('DOMContentLoaded',function(){
   buildLayout()
+  fetch('/api/config').then(function(r){return r.json()}).then(function(d){S.config=d||{readonly:false}; renderDiagReport(); renderCFDStatus();}).catch(function(){S.config={readonly:false}})
   connectWS()
   startCFDPolling()
   loadDiagReport()
