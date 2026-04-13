@@ -1,0 +1,129 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+
+application     simpleFoam;
+
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         50;
+deltaT          1;
+writeControl    timeStep;
+writeInterval   10;
+purgeWrite      0;
+writeFormat     ascii;
+writePrecision  8;
+writeCompression off;
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable no;
+
+functions
+{
+    inletP
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        writeFields     false;
+        patch           inlet;
+        operation       areaAverage;
+        fields          (p);
+    }
+
+
+    outlet1P
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        writeFields     false;
+        patch           outlet1;
+        operation       areaAverage;
+        fields          (p);
+    }
+
+    outlet1Flow
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        writeFields     false;
+        patch           outlet1;
+        operation       sum;
+        fields          (phi);
+    }
+
+    outlet2P
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        writeFields     false;
+        patch           outlet2;
+        operation       areaAverage;
+        fields          (p);
+    }
+
+    outlet2Flow
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        writeFields     false;
+        patch           outlet2;
+        operation       sum;
+        fields          (phi);
+    }
+
+    outlet3P
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        writeFields     false;
+        patch           outlet3;
+        operation       areaAverage;
+        fields          (p);
+    }
+
+    outlet3Flow
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        writeFields     false;
+        patch           outlet3;
+        operation       sum;
+        fields          (phi);
+    }
+
+    outlet4P
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        writeFields     false;
+        patch           outlet4;
+        operation       areaAverage;
+        fields          (p);
+    }
+
+    outlet4Flow
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        writeFields     false;
+        patch           outlet4;
+        operation       sum;
+        fields          (phi);
+    }
+
+}
+

@@ -9,6 +9,8 @@ const S = {
   cfdStatus: null,
   diagReport: null,
   diagLoading: false,
+  bestCase: null,
+  bestCaseAuto: true,
   config: { readonly: false },
 }
 
@@ -84,6 +86,27 @@ function connectWS(){
       renderHeartbeat()
     }catch(e){}
   }
+
+  connectBestCaseWS(base)
+}
+
+let WS_BEST=null
+
+function connectBestCaseWS(base){
+  if(WS_BEST){try{WS_BEST.close()}catch(e){} WS_BEST=null}
+  if(!S.bestCaseAuto)return
+  WS_BEST=new WebSocket(`${base}/ws/best-case?interval=3`)
+  WS_BEST.onmessage=ev=>{
+    try{
+      const d=JSON.parse(ev.data)
+      if(d&&d.ok){
+        S.bestCase=d
+      } else {
+        S.bestCase=d
+      }
+      renderBestCase()
+    }catch(e){}
+  }
 }
 
 function buildLayout(){
@@ -144,10 +167,107 @@ function buildLayout(){
         el('div',{class:'section-label'},'优化进展'),
         el('div',{id:'opt-wrap'},
           el('div',{style:{color:'var(--muted2)',padding:'16px 0'},text:'等待优化任务数据…'}),
+        el('div',{class:'divider'}),
+        el('div',{class:'section-label'},'当前最优算例（ParaView 云图）'),
+        el('div',{id:'bestcase-wrap'},
+          el('div',{style:{color:'var(--muted2)',padding:'16px 0'},text:'加载中…'})),
         ),
       ),
     )
   )
+
+function fetchBestCase(){
+  fetch('/api/best-case')
+    .then(function(r){return r.json()})
+    .then(function(d){S.bestCase=d; renderBestCase()})
+    .catch(function(){S.bestCase={ok:false,error:'network_error'}; renderBestCase()})
+}
+
+function setBestCaseAuto(v){
+  S.bestCaseAuto=!!v
+  try{localStorage.setItem('bestCaseAuto',S.bestCaseAuto?'1':'0')}catch(e){}
+  const proto=location.protocol==='https:'?'wss':'ws'
+  const base=`${proto}://${location.host}`
+  connectBestCaseWS(base)
+  renderBestCase()
+}
+
+function openImageModal(src,title){
+  let modal=document.getElementById('img-modal')
+  if(!modal){
+    modal=el('div',{id:'img-modal',class:'img-modal',onClick:function(ev){if(ev.target===modal)closeImageModal()}})
+    const box=el('div',{class:'img-modal-box'})
+    box.appendChild(el('div',{class:'img-modal-head'},
+      el('div',{id:'img-modal-title',class:'img-modal-title'},title||''),
+      el('button',{class:'img-modal-close',onClick:closeImageModal},'关闭'),
+    ))
+    box.appendChild(el('img',{id:'img-modal-img',class:'img-modal-img',alt:''}))
+    modal.appendChild(box)
+    document.body.appendChild(modal)
+    document.addEventListener('keydown',function(e){if(e.key==='Escape')closeImageModal()})
+  }
+  const img=document.getElementById('img-modal-img')
+  const t=document.getElementById('img-modal-title')
+  if(img)img.src=src
+  if(t)t.textContent=title||''
+  modal.style.display='flex'
+}
+
+function closeImageModal(){
+  const modal=document.getElementById('img-modal')
+  if(modal)modal.style.display='none'
+}
+
+function renderBestCase(){
+  const wrap=document.getElementById('bestcase-wrap')
+  if(!wrap)return
+
+  const d=S.bestCase
+  const auto=S.bestCaseAuto
+
+  const header=el('div',{class:'bestcase-head'},
+    el('div',{class:'bestcase-meta'},
+      el('div',{class:'bestcase-title'},'最优算例云图'),
+      el('div',{class:'bestcase-sub'},d&&d.ok?(`caseRef：${d.caseRef||'-'} · 更新：${d.updatedAt||'-'}`):('等待生成…')),
+    ),
+    el('div',{class:'bestcase-actions'},
+      el('label',{class:'bestcase-toggle'},
+        el('input',{type:'checkbox',checked:auto?'checked':null,onChange:function(ev){setBestCaseAuto(ev.target.checked)}}),
+        el('span',{},'自动刷新'),
+      ),
+      el('button',{class:'btn',onClick:fetchBestCase},'手动刷新'),
+    )
+  )
+
+  const grid=el('div',{class:'bestcase-grid'})
+
+  if(!d||!d.ok){
+    const msg=(d&&d.error)?('云图暂不可用：'+d.error):'云图生成中…'
+    wrap.innerHTML=''
+    wrap.appendChild(el('div',{class:'bestcase-card'},header,el('div',{class:'bestcase-empty',text:msg})))
+    return
+  }
+
+  const vUrl=(d.velocityImageUrl||'')
+  const pUrl=(d.pressureImageUrl||'')
+  const stamp=encodeURIComponent(d.updatedAt||String(Date.now()))
+  const vSrc=vUrl?(vUrl+(vUrl.indexOf('?')>=0?'&':'?')+'t='+stamp):''
+  const pSrc=pUrl?(pUrl+(pUrl.indexOf('?')>=0?'&':'?')+'t='+stamp):''
+
+  const vCard=el('div',{class:'bestcase-imgcard'},
+    el('div',{class:'bestcase-imgtitle'},'速度云图 (Velocity)'),
+    vSrc?el('img',{class:'bestcase-img',src:vSrc,alt:'velocity',onClick:function(){openImageModal(vSrc,'速度云图 (Velocity)')}}):el('div',{class:'bestcase-empty',text:'等待生成…'}),
+  )
+  const pCard=el('div',{class:'bestcase-imgcard'},
+    el('div',{class:'bestcase-imgtitle'},'压力云图 (Pressure)'),
+    pSrc?el('img',{class:'bestcase-img',src:pSrc,alt:'pressure',onClick:function(){openImageModal(pSrc,'压力云图 (Pressure)')}}):el('div',{class:'bestcase-empty',text:'等待生成…'}),
+  )
+
+  grid.appendChild(vCard)
+  grid.appendChild(pCard)
+
+  wrap.innerHTML=''
+  wrap.appendChild(el('div',{class:'bestcase-card'},header,grid))
 }
 
 function triggerDiagnosis(autoLaunch){
@@ -780,10 +900,12 @@ function drawScatter(canvas,history){
 
 document.addEventListener('DOMContentLoaded',function(){
   buildLayout()
+  try{S.bestCaseAuto=(localStorage.getItem('bestCaseAuto')||'1')!=='0'}catch(e){S.bestCaseAuto=true}
   fetch('/api/config').then(function(r){return r.json()}).then(function(d){S.config=d||{readonly:false}; renderDiagReport(); renderCFDStatus();}).catch(function(){S.config={readonly:false}})
   connectWS()
   startCFDPolling()
   loadDiagReport()
+  fetchBestCase()
   fetch('/api/live').then(function(r){return r.json()}).then(function(d){
     if(d.job){S.job=d.job;renderOptimization();renderPipeline()}
     if(d.heartbeat){S.heartbeat=d.heartbeat;renderHeartbeat()}

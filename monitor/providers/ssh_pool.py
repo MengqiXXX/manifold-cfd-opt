@@ -7,7 +7,7 @@ import os
 import threading
 from typing import Optional
 
-from infra.ssh import SSHConfig, ssh_exec as _ssh_exec
+from infra.ssh import SSHConfig, scp_get as _scp_get, ssh_exec as _ssh_exec
 
 _SSH_HOST = os.getenv("VORTEX_SSH_HOST", "192.168.110.10")
 _SSH_PORT = int(os.getenv("VORTEX_SSH_PORT", "22"))
@@ -52,3 +52,18 @@ def is_connected() -> bool:
 
 def last_error() -> str | None:
     return _last_error
+
+
+def scp_get(remote_path: str, local_path: str) -> bool:
+    global _last_error
+    with _lock:
+        try:
+            rc, _, err = _scp_get(_cfg(), remote_path, local_path)
+            if rc == 0:
+                _last_error = None
+                return True
+            _last_error = (err or "").strip() or f"scp_get failed (rc={rc})"
+            return False
+        except Exception as e:
+            _last_error = f"{type(e).__name__}: {e}"
+            return False

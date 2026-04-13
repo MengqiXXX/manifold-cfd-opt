@@ -1,5 +1,24 @@
 # 监控系统公网部署指南（无 VPN 用户可访问）
 
+## 本地启动（Windows）
+
+在仓库根目录双击运行：`monitor\\start_monitor.cmd`。
+
+或在 PowerShell 里运行：
+
+```powershell
+cd d:\\TRAE\\manifold-cfd-opt
+powershell -NoProfile -ExecutionPolicy Bypass -File monitor\\start_monitor.ps1
+```
+
+启动后浏览器打开：`http://127.0.0.1:8090/`（端口可用 `MONITOR_PORT` 覆盖）。
+
+如果你希望监控从别的目录读取 `results*.sqlite`（例如 `d:\\TRAE`），先在同一个 PowerShell 里设置：
+
+```powershell
+$env:VORTEX_ROOT = "d:\\TRAE"
+```
+
 这套监控是一个 FastAPI + 静态页面的 Web 服务，默认监听 `8090`，并通过 SSH 采集远端 OpenFOAM 状态。
 
 公网部署要点：
@@ -124,6 +143,28 @@ sudo htpasswd -c /etc/nginx/.htpasswd-monitor admin
 如果你把监控服务部署在 OpenFOAM 同一台机器上，通常只需要：
 - `VORTEX_SSH_HOST=127.0.0.1`
 - `VORTEX_SSH_USER=<当前用户>`
+
+---
+
+## ParaView 云图渲染配置
+
+监控服务会自动找到“当前最优算例”，并尝试生成两张 PNG：速度云图 `velocity.png` 与压力云图 `pressure.png`。
+
+你需要在运行监控服务的机器上安装 ParaView，并确保可执行文件 `pvpython` 可用。
+
+推荐通过环境变量显式指定 ParaView：
+- `PARAVIEW_PVPYTHON`：`pvpython` 可执行文件路径（例如 Linux: `/opt/paraview/bin/pvpython`；Windows: `C:/Program Files/ParaView/bin/pvpython.exe`）
+- `PARAVIEW_IMAGE_SIZE`：输出分辨率（默认 `1400x800`）
+- `PARAVIEW_TIMEOUT_S`：单次渲染超时秒数（默认 `180`）
+
+云图与缓存目录：
+- `MONITOR_ARTIFACTS_DIR`：云图与缓存目录（默认 `<VORTEX_ROOT>/monitor_artifacts`）
+- 云图输出路径：`<MONITOR_ARTIFACTS_DIR>/best-case/velocity.png` 与 `<MONITOR_ARTIFACTS_DIR>/best-case/pressure.png`
+
+自动更新频率：
+- `BEST_CASE_POLL_INTERVAL_S`：后台检测/更新间隔（默认 `10`）
+
+如果最优算例位于远程服务器，监控服务会通过 SSH 将该算例打包下载到本地缓存后再渲染；因此同样依赖 `VORTEX_SSH_*` 配置。
 
 ---
 

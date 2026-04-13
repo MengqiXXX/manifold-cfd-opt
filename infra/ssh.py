@@ -154,6 +154,29 @@ def scp_put(cfg: SSHConfig, local_path: str | Path, remote_path: str) -> tuple[i
     return last
 
 
+def scp_get(cfg: SSHConfig, remote_path: str, local_path: str | Path) -> tuple[int, str, str]:
+    last: tuple[int, str, str] = (255, "", "")
+    for i in range(3):
+        p = subprocess.run(
+            _scp_base_args(cfg) + [f"{cfg.target()}:{remote_path}", str(local_path)],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        rc = int(p.returncode)
+        out = p.stdout or ""
+        err = p.stderr or ""
+        last = (rc, out, err)
+        if rc == 0:
+            return last
+        if not _is_transient_ssh_error(rc, err):
+            return last
+        time.sleep(1.5 * (i + 1))
+    return last
+
+
 def ssh_put_file(cfg: SSHConfig, local_path: str | Path, remote_path: str, timeout: int = 120) -> tuple[int, str, str]:
     local_path = Path(local_path)
     remote_cmd = "bash -lc " + repr(f"cat > {remote_path}")

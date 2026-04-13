@@ -1,0 +1,31 @@
+evaluator: remote_openfoam
+
+# 最小闭环验证：只跑 1 个设计点（走 run_local 路径）
+n_initial: 1
+n_iterations: 0
+batch_size: 1
+
+bounds:
+  logit_1: [-2.0, 2.0]
+  logit_2: [-2.0, 2.0]
+  logit_3: [-2.0, 2.0]
+
+template_dir: templates/manifold_2d
+cases_base: of_cases
+
+ssh_host: 127.0.0.1
+ssh_user: liumq
+ssh_port: 22
+remote_base: ~/manifold_cases_smoke
+foam_source: /opt/openfoam13/etc/bashrc
+n_cores: 8
+timeout_s: 900
+
+llm_base_url: ""
+llm_api_key: "dummy"
+llm_model: ""
+
+db_path: results_once_local.sqlite
+csv_output: results_once_local.csv
+report_path: optimization_report_once_local.md
+

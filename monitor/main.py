@@ -20,6 +20,7 @@ from .providers.jobs import (
     get_live_job_snapshot,
 )
 from .providers.metrics import get_metric_sample
+from .providers.best_case import artifacts_best_case_dir, best_case_loop, ensure_best_case_rendered, get_best_case
 
 
 def _root_dir() -> Path:
@@ -31,6 +32,7 @@ def _root_dir() -> Path:
 
 ROOT = _root_dir()
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+ARTIFACTS_DIR = artifacts_best_case_dir(ROOT).parent
 
 
 def _admin_token() -> str | None:
@@ -52,8 +54,11 @@ def _readonly() -> bool:
 
 app = FastAPI(title="Manifold Monitor", version="0.1.0")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/artifacts", StaticFiles(directory=str(ARTIFACTS_DIR)), name="artifacts")
 app.state.heartbeat_state = HeartbeatState(False, 1.0, 80)
 app.state.heartbeat_task = None
+app.state.best_case_task = None
 
 
 @app.get("/")
@@ -112,12 +117,37 @@ async def ws_job(ws: WebSocket) -> None:
         return
 
 
+@app.websocket("/ws/best-case")
+async def ws_best_case(ws: WebSocket) -> None:
+    await ws.accept()
+    interval_s = float(ws.query_params.get("interval", "3"))
+    interval_s = max(1.0, min(30.0, interval_s))
+    last_sig = None
+    try:
+        while True:
+            await asyncio.to_thread(ensure_best_case_rendered, ROOT)
+            cur = get_best_case(ROOT)
+            sig = json.dumps(cur, sort_keys=True, ensure_ascii=False)
+            if sig != last_sig:
+                last_sig = sig
+                await ws.send_text(json.dumps(cur, ensure_ascii=False))
+            await asyncio.sleep(interval_s)
+    except WebSocketDisconnect:
+        return
+
+
 @app.get("/api/live")
 def live_snapshot() -> JSONResponse:
     data: dict[str, Any] = {"metrics": None, "job": None}
     data["job"] = get_live_job_snapshot(ROOT)
     data["heartbeat"] = app.state.heartbeat_state.payload()
     return JSONResponse(data)
+
+
+@app.get("/api/best-case")
+async def best_case() -> JSONResponse:
+    payload = await asyncio.to_thread(ensure_best_case_rendered, ROOT)
+    return JSONResponse(payload)
 
 
 @app.get("/api/heartbeat")
@@ -189,3 +219,6 @@ async def _startup() -> None:
     app.state.heartbeat_state = state
     if state.enabled and client and model:
         app.state.heartbeat_task = asyncio.create_task(heartbeat_loop(ROOT, state, client, model))
+    if app.state.best_case_task is None:
+        interval_s = float(os.getenv("BEST_CASE_POLL_INTERVAL_S", "10"))
+        app.state.best_case_task = asyncio.create_task(best_case_loop(ROOT, interval_s))

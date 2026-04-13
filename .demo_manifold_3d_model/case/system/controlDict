@@ -1,0 +1,131 @@
+FoamFile { format ascii; class dictionary; object controlDict; }
+
+solver          incompressibleFluid;
+
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         50;
+deltaT          1;
+writeControl    timeStep;
+writeInterval   10;
+purgeWrite      0;
+writeFormat     ascii;
+writePrecision  8;
+writeCompression off;
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable no;
+
+functions
+{
+    inletP
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        writeFields     false;
+        regionType      patch;
+        name            inlet;
+        operation       areaWeightedAverage;
+        fields          (p);
+    }
+
+
+    outlet1P
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        writeFields     false;
+        regionType      patch;
+        name            outlet1;
+        operation       areaWeightedAverage;
+        fields          (p);
+    }
+
+    outlet1Flow
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        writeFields     false;
+        regionType      patch;
+        name            outlet1;
+        operation       sum;
+        fields          (phi);
+    }
+
+    outlet2P
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        writeFields     false;
+        regionType      patch;
+        name            outlet2;
+        operation       areaWeightedAverage;
+        fields          (p);
+    }
+
+    outlet2Flow
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        writeFields     false;
+        regionType      patch;
+        name            outlet2;
+        operation       sum;
+        fields          (phi);
+    }
+
+    outlet3P
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        writeFields     false;
+        regionType      patch;
+        name            outlet3;
+        operation       areaWeightedAverage;
+        fields          (p);
+    }
+
+    outlet3Flow
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        writeFields     false;
+        regionType      patch;
+        name            outlet3;
+        operation       sum;
+        fields          (phi);
+    }
+
+    outlet4P
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        writeFields     false;
+        regionType      patch;
+        name            outlet4;
+        operation       areaWeightedAverage;
+        fields          (p);
+    }
+
+    outlet4Flow
+    {
+        type            surfaceFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    writeTime;
+        writeFields     false;
+        regionType      patch;
+        name            outlet4;
+        operation       sum;
+        fields          (phi);
+    }
+
+}

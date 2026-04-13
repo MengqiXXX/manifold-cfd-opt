@@ -327,8 +327,7 @@ class OpenFOAMRunner:
 
             solver_cmd = (
                 "rm -f solver.pid; "
-                f"launcher='mpirun -np {self.n_cores} foamRun -solver {self.solver} -parallel'; "
-                "if command -v setsid >/dev/null 2>&1; then launcher=\"setsid $launcher\"; fi; "
+                f'launcher="mpirun -np {self.n_cores} foamRun -solver {self.solver} -parallel"; '
                 "($launcher > log.solver 2>&1 & echo $! > solver.pid); "
                 "wait $(cat solver.pid)"
             )
